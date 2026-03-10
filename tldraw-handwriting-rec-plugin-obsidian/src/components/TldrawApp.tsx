@@ -34,6 +34,8 @@ import {
 import PluginKeyboardShortcutsDialog from './PluginKeyboardShortcutsDialog'
 import PluginQuickActions from './PluginQuickActions'
 
+import { initializeStrokeListener } from "../handwriting/strokeListener"
+
 type TldrawAppOptions = {
 	iconAssetUrls?: TLUiAssetUrlOverrides['icons']
 	isReadonly?: boolean
@@ -267,7 +269,10 @@ const TldrawApp = ({
 				setFocusedEditor(false, editor)
 			}}
 		>
-			<Tldraw
+
+
+
+			<Tldraw // This component is responsible for rendering the canvas.
 				{...storeProps}
 				assetUrls={assetUrls.current}
 				hideUi={hideUi}
@@ -276,10 +281,15 @@ const TldrawApp = ({
 				components={overridesUiComponents.current}
 				// Set this flag to false when a tldraw document is embed into markdown to prevent it from gaining focus when it is loaded.
 				autoFocus={false}
-				onMount={setAppState}
-				tools={tools}
+				onMount={(editor) => {
+					setAppState(editor) //setAppState is the function that stores the editor instance inside the plugin's internal state.
+					initializeStrokeListener(editor)
+					console.log("Tldraw editor mounted:", editor)
+				}} 				tools={tools}
 				className={fbWorkAroundClassname}
 			/>
+
+
 		</div>
 	)
 }
