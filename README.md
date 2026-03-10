@@ -3,23 +3,19 @@
 *REPO MAP*
 
 ```
-Here is the **Repository Map** for the `tldraw-search-plugin` project. This map links every file to the corresponding path on the GitHub repository.
+Here is the **Repository Map** for the `tldraw-search-plugin` project. 
+This map links every file to the corresponding path on the GitHub repository.
 ```
 ### 🗺️ Project Root & Planning
 
-* **[`README.md`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/README.md%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/README.md))**
-* **[`plan/`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/))**
-* [`plan.md`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/plan.md%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/plan.md))
+* **[`README.md`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/README.md)**
+* **[`plan/`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/)**
+* [`plan.md`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/plan.md)
 * **`analysis/`**
-* [`analysis.md`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/analysis/analysis.md%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/analysis/analysis.md)) | [`canvas.png`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/analysis/canvas.png%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/analysis/canvas.png)) | [`example-draw.png`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/analysis/example-draw.png%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/analysis/example-draw.png))
-
+* [`analysis.md`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/analysis/analysis.md) | [`canvas.png`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/analysis/canvas.png) | [`example-draw.png`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/analysis/example-draw.png)
 
 * **`execution/`**
-* [`execution.md`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/execution/execution.md%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/execution/execution.md)) | [`recognition-pipeline.md`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/execution/recognition-pipeline.md%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/execution/recognition-pipeline.md))
-
-
-
-
+* [`execution.md`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/execution/execution.md) | [`recognition-pipeline.md`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/execution/recognition-pipeline.md)
 
 ---
 
@@ -29,21 +25,18 @@ This is the main workspace containing the Obsidian plugin logic.
 
 #### ⚙️ Configuration & Metadata
 
-* [`package.json`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/package.json%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/package.json))
-* [`manifest.json`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/manifest.json%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/manifest.json))
-* [`eslint.config.mjs`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/eslint.config.mjs%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/eslint.config.mjs))
-* [`tsconfig.json`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/tsconfig.json%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/tsconfig.json))
+* [`package.json`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/package.json)
+* [`manifest.json`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/manifest.json)
+* [`eslint.config.mjs`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/eslint.config.mjs)
+* [`tsconfig.json`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/tsconfig.json)
 
 #### 🛠️ Scripts & Patches
 
-* **[`scripts/`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/scripts/%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/scripts/))**
-* [`build.mts`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/scripts/build.mts%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/scripts/build.mts)) | [`package.mts`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/scripts/package.mts%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/scripts/package.mts)) | [`version-bump.mts`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/scripts/version-bump.mts%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/scripts/version-bump.mts))
+* **[`scripts/`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/scripts/)**
+* [`build.mts`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/scripts/build.mts) | [`package.mts`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/scripts/package.mts) | [`version-bump.mts`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/scripts/version-bump.mts)
 
-
-* **[`patches/`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/patches/%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/patches/))**
-* [`tldraw+3.15.3+001.patch`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/patches/tldraw%2B3.15.3%2B001%2Bno-source-maps.patch%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/patches/tldraw%2B3.15.3%2B001%2Bno-source-maps.patch))
-
-
+* **[`patches/`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/patches/)**
+* [`tldraw+3.15.3+001.patch`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/patches/tldraw+3.15.3+001+no-source-maps.patch)
 
 ---
 
@@ -51,54 +44,42 @@ This is the main workspace containing the Obsidian plugin logic.
 
 #### 🎨 React Components
 
-* **[`components/`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/))**
-* [`TldrawApp.tsx`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/TldrawApp.tsx%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/TldrawApp.tsx))
-* [`TextSuggestions.tsx`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/TextSuggestions.tsx%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/TextSuggestions.tsx))
-* **`settings/`**: [`VaultSettings.tsx`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/settings/VaultSettings.tsx%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/settings/VaultSettings.tsx)) | [`FileSettings.tsx`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/settings/FileSettings.tsx%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/settings/FileSettings.tsx))
-* **`plugin/`**: [`TldrawInObsidian.tsx`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/plugin/TldrawInObsidian.tsx%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/plugin/TldrawInObsidian.tsx)) | [`AuditResultsSummary.tsx`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/plugin/AuditResultsSummary.tsx%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/plugin/AuditResultsSummary.tsx))
-
-
+* **[`components/`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/)**
+* [`TldrawApp.tsx`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/TldrawApp.tsx)
+* [`TextSuggestions.tsx`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/TextSuggestions.tsx)
+* **`settings/`**: [`VaultSettings.tsx`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/settings/VaultSettings.tsx) | [`FileSettings.tsx`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/settings/FileSettings.tsx)
+* **`plugin/`**: [`TldrawInObsidian.tsx`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/plugin/TldrawInObsidian.tsx) | [`AuditResultsSummary.tsx`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/components/plugin/AuditResultsSummary.tsx)
 
 #### 🔌 Obsidian Integration
 
-* **[`obsidian/`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/))**
-* [`TldrawView.ts`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/TldrawView.ts%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/TldrawView.ts))
-* [`TldrawSettingsTab.ts`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/TldrawSettingsTab.ts%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/TldrawSettingsTab.ts))
-* **`modal/`**: [`FileSearchModal.ts`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/modal/FileSearchModal.ts%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/modal/FileSearchModal.ts)) | [`DownloadManagerModal.ts`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/modal/DownloadManagerModal.ts%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/modal/DownloadManagerModal.ts))
-* **`helpers/`**: [`vault.ts`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/helpers/vault.ts%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/helpers/vault.ts)) | [`front-matter.ts`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/helpers/front-matter.ts%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/helpers/front-matter.ts))
-
-
+* **[`obsidian/`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/)**
+* [`TldrawView.ts`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/TldrawView.ts)
+* [`TldrawSettingsTab.ts`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/TldrawSettingsTab.ts)
+* **`modal/`**: [`FileSearchModal.ts`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/modal/FileSearchModal.ts) | [`DownloadManagerModal.ts`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/modal/DownloadManagerModal.ts)
+* **`helpers/`**: [`vault.ts`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/helpers/vault.ts) | [`front-matter.ts`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/obsidian/helpers/front-matter.ts)
 
 #### 🏗️ Tldraw Logic & Utilities
 
-* **[`tldraw/`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/tldraw/%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/tldraw/))**
-* [`asset-store.ts`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/tldraw/asset-store.ts%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/tldraw/asset-store.ts)) | [`indexeddb-store.ts`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/tldraw/indexeddb-store.ts%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/tldraw/indexeddb-store.ts)) | [`ui-overrides.ts`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/tldraw/ui-overrides.ts%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/tldraw/ui-overrides.ts))
+* **[`tldraw/`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/tldraw/)**
+* [`asset-store.ts`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/tldraw/asset-store.ts) | [`indexeddb-store.ts`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/tldraw/indexeddb-store.ts) | [`ui-overrides.ts`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/tldraw/ui-overrides.ts)
 
-
-* **[`utils/`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/utils/%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/utils/))**
-* [`migrate.ts`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/utils/migrate.ts%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/utils/migrate.ts)) | [`fonts.ts`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/utils/fonts.ts%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/utils/fonts.ts)) | [`path.ts`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/utils/path.ts%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/utils/path.ts))
-
-
+* **[`utils/`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/utils/)**
+* [`migrate.ts`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/utils/migrate.ts) | [`fonts.ts`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/utils/fonts.ts) | [`path.ts`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/utils/path.ts)
 
 #### ⚓ Hooks & Contexts
 
-* **[`hooks/`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/hooks/%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/hooks/))**
-* [`useTldrawAppHook.ts`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/hooks/useTldrawAppHook.ts%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/hooks/useTldrawAppHook.ts)) | [`useSettingsManager.ts`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/hooks/useSettingsManager.ts%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/hooks/useSettingsManager.ts))
+* **[`hooks/`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/hooks/)**
+* [`useTldrawAppHook.ts`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/hooks/useTldrawAppHook.ts) | [`useSettingsManager.ts`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/hooks/useSettingsManager.ts)
 
-
-* **[`contexts/`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/contexts/%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/contexts/))**
-* [`plugin.tsx`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/contexts/plugin.tsx%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/contexts/plugin.tsx))
-
-
+* **[`contexts/`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/contexts/)**
+* [`plugin.tsx`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/src/contexts/plugin.tsx)
 
 ---
 
 ### 🚀 Release Assets
 
-* **[`release/`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/release/%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/release/))**
-* [`manifest.json`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/release/manifest.json%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/release/manifest.json)) | [`versions.json`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/release/versions.json%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/release/versions.json))
-
-
+* **[`release/`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/release/)**
+* [`manifest.json`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/release/manifest.json) | [`versions.json`](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/tldraw-handwriting-rec-plugin-obsidian/release/versions.json)
 
 
  
