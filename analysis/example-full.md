@@ -3,6 +3,8 @@
 
 ![options on the bottom right corner](options.png)
 *options on the bottom right corner*
+
+
 ![an example drawing of "a b c" in the infinite canvas](example-draw.png)
 *an example drawing of "a b c" in the infinite canvas*
 
