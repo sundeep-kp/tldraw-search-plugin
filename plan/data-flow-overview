@@ -1,0 +1,430 @@
+
+
+# data_flow.md
+
+## Data Flow Architecture for Handwriting Recognition in Tldraw Obsidian
+
+This document describes how handwritten strokes drawn inside the **tldraw canvas integrated in Obsidian** move through the recognition system and eventually become searchable text inside the vault.
+
+The goal is to transform handwritten vector strokes into indexed text without modifying the underlying drawing engine.
+
+---
+
+# System Overview
+
+The recognition system sits **on top of the existing Tldraw plugin** as an observer layer.
+
+It listens to editor events, extracts stroke geometry, processes handwriting recognition, and stores results in the markdown document.
+
+High-level pipeline:
+
+```id="g6f7h0"
+User draws handwriting
+      │
+      ▼
+Tldraw canvas editor
+      │
+      ▼
+Shape created (type: draw)
+      │
+      ▼
+Editor store update
+      │
+      ▼
+Stroke listener
+      │
+      ▼
+Stroke extraction
+      │
+      ▼
+Stroke normalization
+      │
+      ▼
+Stroke grouping
+      │
+      ▼
+Handwriting recognizer
+      │
+      ▼
+Recognized text
+      │
+      ▼
+Index written to markdown
+      │
+      ▼
+Obsidian search index
+```
+
+---
+
+# Stage 1 — Canvas Input
+
+Handwriting begins when the user draws using the **freehand draw tool**.
+
+Each continuous pen stroke produces a new shape in the editor:
+
+```id="dpxa7g"
+shape.type = "draw"
+```
+
+Each shape contains vector stroke data.
+
+Example structure:
+
+```id="ujg5l4"
+shape
+ ├─ id
+ ├─ x
+ ├─ y
+ └─ props
+     └─ segments
+          └─ points[]
+```
+
+Points represent the pen trajectory.
+
+Example point:
+
+```id="vck6dq"
+{
+  x: number
+  y: number
+  z: number
+}
+```
+
+Where:
+
+```id="rxr1sh"
+x → horizontal movement
+y → vertical movement
+z → pressure
+```
+
+---
+
+# Stage 2 — Store Event
+
+The editor maintains all state inside a reactive store.
+
+Whenever shapes change, the store emits an update event.
+
+The handwriting system subscribes to:
+
+```id="zj6wff"
+editor.store.listen()
+```
+
+When a new draw shape appears, the system triggers stroke processing.
+
+Recognition is performed only when:
+
+```id="m6oajh"
+shape.props.isComplete === true
+```
+
+This prevents processing incomplete strokes.
+
+---
+
+# Stage 3 — Stroke Extraction
+
+The listener extracts raw stroke points from the shape.
+
+Example extraction process:
+
+```id="q2g41v"
+shape.props.segments
+   → segment.points
+      → [x,y] coordinates
+```
+
+Result:
+
+```id="g2bh8b"
+stroke = [
+  [x1,y1],
+  [x2,y2],
+  [x3,y3]
+]
+```
+
+Multiple segments are merged into a single stroke representation.
+
+---
+
+# Stage 4 — Stroke Normalization
+
+Raw strokes can contain hundreds of points.
+
+Before recognition they should be normalized.
+
+Normalization steps include:
+
+### Resampling
+
+Reduce stroke complexity.
+
+Example:
+
+```id="t5w8rf"
+original points: 200
+normalized points: 64
+```
+
+---
+
+### Scaling
+
+Normalize stroke size to a standard range.
+
+Example:
+
+```id="35l0r3"
+0 ≤ x ≤ 1
+0 ≤ y ≤ 1
+```
+
+---
+
+### Translation
+
+Shift stroke origin to:
+
+```id="w8vdc9"
+(0,0)
+```
+
+This removes dependency on canvas position.
+
+---
+
+# Stage 5 — Stroke Grouping
+
+Individual strokes often represent letters rather than full words.
+
+Example:
+
+```id="p7g2zt"
+h + e + l + l + o
+```
+
+Each letter may be drawn as a separate stroke.
+
+Grouping logic merges nearby strokes into word candidates.
+
+Grouping criteria:
+
+### Temporal proximity
+
+```id="04fov4"
+time difference < 800 ms
+```
+
+---
+
+### Spatial proximity
+
+```id="cptm4t"
+horizontal distance < threshold
+```
+
+Grouped strokes form a **word candidate**.
+
+Example:
+
+```id="y3n3eh"
+{
+ strokes: [stroke1, stroke2, stroke3],
+ boundingBox: {...}
+}
+```
+
+---
+
+# Stage 6 — Recognition
+
+Grouped strokes are passed to a handwriting recognition engine.
+
+Possible engines include:
+
+* Google ML Kit Digital Ink Recognition
+* MyScript iink SDK
+
+Recognizer input example:
+
+```json id="ew1l0b"
+{
+ "strokes": [
+   [
+     {"x":0,"y":0,"t":0},
+     {"x":1,"y":2,"t":1}
+   ]
+ ]
+}
+```
+
+Recognizer output:
+
+```json id="7y9y3n"
+{
+ "text": "hello",
+ "confidence": 0.94
+}
+```
+
+---
+
+# Stage 7 — Index Generation
+
+Recognized text is converted into a searchable index.
+
+Example index entry:
+
+```id="ujm0l3"
+{
+ word: "hello",
+ shapeIds: ["shape1","shape2","shape3"],
+ boundingBox: {...}
+}
+```
+
+This index allows the system to map text results back to canvas positions.
+
+---
+
+# Stage 8 — Markdown Storage
+
+Recognition results must persist across sessions.
+
+The plugin stores recognition metadata inside the markdown document.
+
+Example:
+
+```id="b3n8y4"
+<!-- tldraw-handwriting-index
+shape:iQzNB4HB6nUwBK4hMf0p1 = "a"
+shape:q6IgmlC3Z7JnfaGPiUXlv = "b"
+shape:94zqqtdzWw3reavN9eSXr = "c"
+-->
+```
+
+Because this text is inside the markdown file, **Obsidian automatically indexes it**.
+
+---
+
+# Stage 9 — Search Integration
+
+When the user searches inside Obsidian:
+
+```id="3y1i5f"
+search query
+      │
+      ▼
+markdown index
+      │
+      ▼
+recognized handwriting entry
+      │
+      ▼
+shape id retrieved
+      │
+      ▼
+canvas navigation
+```
+
+The editor can move the viewport to the relevant location.
+
+Example:
+
+```id="h4n7ad"
+editor.setCamera()
+```
+
+---
+
+# Stage 10 — Canvas Navigation
+
+Once a search result is selected:
+
+```id="c7dmy8"
+retrieve bounding box
+      │
+      ▼
+zoom canvas
+      │
+      ▼
+highlight strokes
+```
+
+This allows users to jump directly to handwritten content.
+
+---
+
+# Data Flow Summary
+
+Complete system pipeline:
+
+```id="e4u0h9"
+Canvas drawing
+      │
+      ▼
+Draw shape created
+      │
+      ▼
+Store update event
+      │
+      ▼
+Stroke listener
+      │
+      ▼
+Stroke extraction
+      │
+      ▼
+Normalization
+      │
+      ▼
+Stroke grouping
+      │
+      ▼
+Recognition engine
+      │
+      ▼
+Search index
+      │
+      ▼
+Markdown storage
+      │
+      ▼
+Obsidian search
+```
+
+---
+
+# Key Design Principles
+
+The system follows three design principles:
+
+### Non-intrusive
+
+The Tldraw engine is not modified.
+
+---
+
+### Modular
+
+Each stage is implemented as a separate module.
+
+---
+
+### Search-friendly
+
+Recognition results are stored directly inside markdown.
+
+---
+
+# Result
+
+This architecture allows handwritten strokes drawn inside Tldraw to become **fully searchable knowledge inside Obsidian** while preserving compatibility with future plugin updates.
+
+---
