@@ -1,1 +1,1 @@
-[[plan.md]]
+[Here's the plan](plan.md)
