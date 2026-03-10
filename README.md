@@ -7,7 +7,8 @@ Here is the **Repository Map** for the `tldraw-search-plugin` project. This map 
 
 ### 🗺️ Project Root & Planning
 
-[**README.md**](https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/README.md)
+<a href="https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/README.md"><strong>README.md</strong></a>
+
 * **[`plan/`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/))**
 * [`plan.md`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/plan.md%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/plan.md))
 * **`analysis/`**
