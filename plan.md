@@ -347,3 +347,4 @@ The final result should allow users to search their handwritten diagrams and not
 the idea is to use an existing obsidian plugin: https://github.com/tldraw/obsidian-plugin
 
 instead of coding from scratch and going through dependency hell of working out different support platforms like ipads and pen tablets etc.
+```
