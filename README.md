@@ -4,11 +4,10 @@
 
 ```
 Here is the **Repository Map** for the `tldraw-search-plugin` project. This map links every file to the corresponding path on the GitHub repository.
-
+```
 ### 🗺️ Project Root & Planning
 
-<a href="https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/README.md"><strong>README.md</strong></a>
-
+* **[`README.md`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/README.md%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/README.md))**
 * **[`plan/`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/))**
 * [`plan.md`](https://www.google.com/search?q=%5Bhttps://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/plan.md%5D(https://github.com/sundeep-kp/tldraw-search-plugin/blob/main/plan/plan.md))
 * **`analysis/`**
@@ -103,7 +102,7 @@ This is the main workspace containing the Obsidian plugin logic.
 
 
  
-```
+
 
 # Temporary
 
