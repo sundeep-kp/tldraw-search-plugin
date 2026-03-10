@@ -1,0 +1,26 @@
+{
+	"compilerOptions": {
+		"baseUrl": ".",
+		"inlineSourceMap": true,
+		"inlineSources": true,
+		"module": "ESNext",
+		"target": "es2023",
+		"allowJs": true,
+		"noImplicitAny": true,
+		"noImplicitThis": true,
+		"moduleResolution": "bundler",
+		"importHelpers": true,
+		"isolatedModules": true,
+		"strict": true,
+		"strictNullChecks": true,
+		// Set types to empty array to avoid referencing node types within the plugin source code
+		"types": [],
+		"lib": ["DOM", "ESNext"],
+		"jsx": "react",
+		"composite": true,
+		"skipLibCheck": true,
+		"skipDefaultLibCheck": true,
+		"noEmit": true
+	},
+	"include": ["src", "scripts", "eslint.config.mjs"]
+}
