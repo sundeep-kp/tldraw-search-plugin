@@ -289,6 +289,16 @@ Build an Obsidian plugin that enables:
 
 The final result should allow users to search their handwritten diagrams and notes as easily as typed text.
 
+*constraints*
+```
+Development rules:
+
+1. Never modify the tldraw library code
+2. Never change store serialization
+3. Never modify patches/
+4. Only extend plugin via new modules
+```
+
 ---
 
 **Note:** The idea is to use an existing Obsidian plugin: [https://github.com/tldraw/obsidian-plugin](https://github.com/tldraw/obsidian-plugin) instead of coding from scratch and going through dependency hell of supporting different platforms like iPads and pen tablets.

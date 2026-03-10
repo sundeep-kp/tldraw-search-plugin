@@ -49,6 +49,12 @@ Handwriting recognizer
 Recognized text
       │
       ▼
+word entity
+      │
+      ▼
+bounding box calculation
+      │
+      ▼
 Index written to markdown
       │
       ▼

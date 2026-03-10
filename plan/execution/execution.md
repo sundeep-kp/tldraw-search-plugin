@@ -276,6 +276,35 @@ Example output:
 
 Initial prototype may process **single strokes only**.
 
+
+## Handwriting Recognition Index
+```
+Recognized handwriting is stored in a markdown comment block inside the
+document to preserve compatibility with Obsidian’s text-based storage model.
+
+Example:
+
+<!-- tldraw-handwriting-index:start -->
+{
+  "version": 1,
+  "words": [
+    {
+      "id": "word_1",
+      "text": "motor",
+      "confidence": 0.91,
+      "pageId": "page:page",
+      "shapeIds": ["shape:abc","shape:def"],
+      "bbox": {
+        "minX": 100,
+        "minY": 200,
+        "maxX": 180,
+        "maxY": 230
+      }
+    }
+  ]
+}
+<!-- tldraw-handwriting-index:end -->
+```
 ---
 
 # Step 7 — Integrate Handwriting Recognizer
