@@ -1,3 +1,7 @@
+*This repo was forked directly from [tldraw plugin official repo](https://github.com/tldraw/obsidian-plugin)*
+
+
+
 # Tldraw in Obsidian Plugin
 
 https://github.com/holxsam/holxsam/assets/41220650/1786cc75-3a15-431f-b13a-e8f51cfde952
