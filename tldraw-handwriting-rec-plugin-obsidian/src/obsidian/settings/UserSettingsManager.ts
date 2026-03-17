@@ -47,14 +47,21 @@ export default class UserSettingsManager {
 			embeds: embedsDefault,
 			fileDestinations: fileDestinationsDefault,
 			file: fileDefault,
+			handwritingRecognition: handwritingRecognitionDefault,
 			...restDefault
 		} = DEFAULT_SETTINGS
-		const { embeds, fileDestinations, tldrawOptions, file, ...rest } =
+		const { embeds, fileDestinations, tldrawOptions, file, handwritingRecognition, ...rest } =
 			((await this.#plugin.loadData()) as Partial<TldrawPluginSettings>) || {}
 
 		const embedsMerged = Object.assign({}, embedsDefault, embeds)
 
 		const fileMerged = Object.assign({}, fileDefault, file)
+
+		const handwritingRecognitionMerged = Object.assign(
+			{},
+			handwritingRecognitionDefault,
+			handwritingRecognition
+		)
 
 		const fileDestinationsMerged = Object.assign(
 			{},
@@ -89,6 +96,7 @@ export default class UserSettingsManager {
 			fileDestinations: fileDestinationsMerged,
 			tldrawOptions,
 			file: fileMerged,
+			handwritingRecognition: handwritingRecognitionMerged,
 			...restMerged,
 		}
 

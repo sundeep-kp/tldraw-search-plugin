@@ -61,6 +61,8 @@ Last updated: 2026-03-17
 - [x] Added `scripts/check-onlinehtr-preprocessor.ts` invariant check script
 - [x] Added `scripts/check-ctc-decoder.ts` decoder behavior check script
 - [x] Added `scripts/check-recognition-lifecycle.ts` smoke script for debounce and stale-run behavior
+- [x] Verified recognition store cleanup on scope release in `scripts/check-recognition-lifecycle.ts`
+- [x] Added `scripts/check-model-config.ts` for model config normalization/readiness checks
 - [x] Repeated `npm run build` checks succeeded after each implementation unit
 
 ## Pending Next Steps
@@ -116,6 +118,7 @@ Decision: use `PellelNitram/OnlineHTR` as the model source and integrate via pur
 - [x] Add `onnxruntime-web` dependency.
 - [x] Add `src/handwriting/ctcDecoder.ts` for greedy CTC decoding.
 - [x] Add `src/handwriting/modelConfig.ts` for model URL/alphabet/runtime configuration.
+- [x] Add model config normalization/readiness helpers in `src/handwriting/modelConfig.ts`.
 
 ### Phase 5 - App Integration (In-Memory Results Only)
 
@@ -124,6 +127,13 @@ Decision: use `PellelNitram/OnlineHTR` as the model source and integrate via pur
 - [x] Add stale-run cancellation/versioning to drop outdated async results.
 - [x] Keep scope to in-memory recognition only (defer markdown index writeback).
 - [x] Add guarded recognizer engine selection in `TldrawApp` (`onnx-web` when config is valid, else `stub`).
+- [x] Source recognizer model config from `userSettings.handwritingRecognition` in `TldrawApp`.
+
+### Settings Plumbing
+
+- [x] Extend `TldrawPluginSettings` with optional `handwritingRecognition` model fields.
+- [x] Merge nested `handwritingRecognition` defaults in `UserSettingsManager.loadSettings()`.
+- [x] Add `src/components/settings/HandwritingRecognitionSettings.tsx` and register `Handwriting` tab in settings UI.
 
 ### Phase 6 - Verification and Hardening
 
@@ -131,7 +141,7 @@ Decision: use `PellelNitram/OnlineHTR` as the model source and integrate via pur
 - [x] Add deterministic check scripts for preprocessor + decoder behavior.
 - [x] Add lifecycle smoke check for debounced recognition and stale-run cancellation.
 - [ ] Verify no UI hitching under rapid drawing (debounce effectiveness).
-- [ ] Verify per-document cleanup/lifecycle correctness for recognition results.
+- [x] Verify per-document cleanup/lifecycle correctness for recognition results.
 - [ ] Compare plugin ONNX predictions against external parity harness for identical serialized input.
 
 ## Update Protocol

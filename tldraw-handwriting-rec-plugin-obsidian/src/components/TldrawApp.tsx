@@ -5,7 +5,7 @@ import { lockZoomIcon } from 'src/assets/data-icons'
 import { TldrawInObsidianPluginProvider } from 'src/contexts/plugin'
 import { useClickAwayListener } from 'src/hooks/useClickAwayListener'
 import useUserPluginSettings from 'src/hooks/useUserPluginSettings'
-import { DEFAULT_ONLINE_HTR_MODEL_CONFIG } from 'src/handwriting/modelConfig'
+import { isOnlineHtrModelConfigReady, resolveOnlineHtrModelConfig } from 'src/handwriting/modelConfig'
 import { processExtractedStroke } from 'src/handwriting/pipeline'
 import { createHandwritingRecognizer } from 'src/handwriting/recognizer'
 import {
@@ -259,14 +259,11 @@ const TldrawApp = ({
 	})
 
 	const onnxModelConfig = React.useMemo(() => {
-		return DEFAULT_ONLINE_HTR_MODEL_CONFIG
-	}, [])
+		return resolveOnlineHtrModelConfig(userSettings.handwritingRecognition)
+	}, [userSettings.handwritingRecognition])
 
 	const recognizerEngine = React.useMemo(() => {
-		const hasModelUrl = typeof onnxModelConfig.modelUrl === 'string' && onnxModelConfig.modelUrl.length > 0
-		const hasAlphabet =
-			Array.isArray(onnxModelConfig.alphabet) && onnxModelConfig.alphabet.length > 0
-		return hasModelUrl && hasAlphabet ? 'onnx-web' : 'stub'
+		return isOnlineHtrModelConfigReady(onnxModelConfig) ? 'onnx-web' : 'stub'
 	}, [onnxModelConfig])
 
 	React.useEffect(() => {

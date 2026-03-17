@@ -7,6 +7,7 @@ import UserSettingsManager from 'src/obsidian/settings/UserSettingsManager'
 import AssetsSettings from './AssetsSettings'
 import EmbedsSettings from './EmbedsSettings'
 import FileSettings from './FileSettings'
+import HandwritingRecognitionSettings from './HandwritingRecognitionSettings'
 import StartUpSettings from './StartUpSettings'
 import TldrawEditorOptions from './TldrawEditorOptions'
 import VaultSettings from './VaultSettings'
@@ -40,6 +41,10 @@ const TABS = {
 	assets: {
 		label: 'Assets',
 		Component: AssetsSettings,
+	},
+	handwriting: {
+		label: 'Handwriting',
+		Component: HandwritingRecognitionSettings,
 	},
 } satisfies Record<
 	string,

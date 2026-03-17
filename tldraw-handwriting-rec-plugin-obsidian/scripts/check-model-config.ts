@@ -1,0 +1,45 @@
+import {
+	DEFAULT_ONLINE_HTR_MODEL_CONFIG,
+	isOnlineHtrModelConfigReady,
+	resolveOnlineHtrModelConfig,
+} from 'src/handwriting/modelConfig'
+
+function assert(condition: unknown, message: string): asserts condition {
+	if (!condition) throw new Error(message)
+}
+
+function run() {
+	const empty = resolveOnlineHtrModelConfig(undefined)
+	assert(empty === DEFAULT_ONLINE_HTR_MODEL_CONFIG, 'Expected undefined input to return default config.')
+	assert(!isOnlineHtrModelConfigReady(empty), 'Expected default config to be not ready.')
+
+	const fromCsv = resolveOnlineHtrModelConfig({
+		modelUrl: '  https://example.com/model.onnx  ',
+		alphabet: 'a,b,c',
+		blankIndex: 2.8,
+	})
+	assert(fromCsv.modelUrl === 'https://example.com/model.onnx', 'Expected modelUrl to be trimmed.')
+	assert(fromCsv.alphabet.join('') === 'abc', 'Expected CSV alphabet parsing to preserve order.')
+	assert(fromCsv.blankIndex === 2, 'Expected blankIndex to be normalized with floor().')
+	assert(isOnlineHtrModelConfigReady(fromCsv), 'Expected CSV config to be recognized as ready.')
+
+	const fromChars = resolveOnlineHtrModelConfig({
+		modelUrl: '/vault/model.onnx',
+		alphabet: 'ab ',
+		inputName: '  ink  ',
+		outputName: ' logits ',
+		blankIndex: -1,
+	})
+	assert(fromChars.alphabet.join('') === 'ab', 'Expected character alphabet parsing for plain strings.')
+	assert(fromChars.inputName === 'ink', 'Expected inputName to be trimmed.')
+	assert(fromChars.outputName === 'logits', 'Expected outputName to be trimmed.')
+	assert(fromChars.blankIndex === 0, 'Expected invalid blankIndex to fall back to default.')
+
+	console.log('[check-model-config] PASS', {
+		defaultReady: isOnlineHtrModelConfigReady(empty),
+		csvReady: isOnlineHtrModelConfigReady(fromCsv),
+		charsAlphabetLength: fromChars.alphabet.length,
+	})
+}
+
+run()

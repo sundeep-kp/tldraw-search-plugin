@@ -113,8 +113,15 @@ async function run() {
 	if (timer) clearTimeout(timer)
 	releaseDocumentRecognitionScope(documentId)
 
+	const cleanedResults = getDocumentRecognitionResults(documentId)
+	assert(
+		cleanedResults.length === 0,
+		`Expected recognition results to be cleared after scope release, got ${cleanedResults.length}.`
+	)
+
 	console.log('[check-recognition-lifecycle] PASS', {
 		staleSkips,
+		cleanupVerified: true,
 		successResults: successResults.map((r) => ({ groupId: r.groupId, text: r.candidates[0]?.text })),
 	})
 }

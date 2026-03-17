@@ -156,6 +156,13 @@ export interface TldrawPluginSettings extends DeprecatedFileDestinationSettings 
 		 */
 		customTags?: string[]
 	}
+	handwritingRecognition?: {
+		modelUrl?: string
+		alphabet?: string[] | string
+		inputName?: string
+		outputName?: string
+		blankIndex?: number
+	}
 }
 
 export const DEFAULT_SETTINGS = {
@@ -186,6 +193,13 @@ export const DEFAULT_SETTINGS = {
 	},
 	file: {
 		insertTags: true,
+	},
+	handwritingRecognition: {
+		modelUrl: '',
+		alphabet: [],
+		inputName: 'input',
+		outputName: 'output',
+		blankIndex: 0,
 	},
 } as const satisfies Partial<TldrawPluginSettings>
 
