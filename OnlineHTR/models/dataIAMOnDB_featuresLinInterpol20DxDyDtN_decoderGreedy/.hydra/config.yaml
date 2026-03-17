@@ -1,0 +1,76 @@
+extras:
+  ignore_warnings: false
+  enforce_tags: true
+  print_config: true
+paths:
+  root_dir: ${oc.env:PROJECT_ROOT}
+  data_dir: ${paths.root_dir}/data/
+  log_dir: ${paths.root_dir}/logs/
+  output_dir: ${hydra:runtime.output_dir}
+  work_dir: ${hydra:runtime.cwd}
+logger:
+  tensorboard:
+    _target_: lightning.pytorch.loggers.tensorboard.TensorBoardLogger
+    save_dir: ${paths.output_dir}/tensorboard/
+    name: null
+    log_graph: false
+    default_hp_metric: true
+    prefix: ''
+callbacks:
+  model_checkpoint:
+    _target_: lightning.pytorch.callbacks.ModelCheckpoint
+    dirpath: ${paths.output_dir}/checkpoints
+    filename: epoch={epoch:06d}_step={step:010d}_val_loss={val/loss:.4f}
+    monitor: val/loss
+    verbose: false
+    save_last: true
+    save_top_k: 3
+    mode: min
+    auto_insert_metric_name: false
+    save_weights_only: false
+    every_n_train_steps: null
+    train_time_interval: null
+    every_n_epochs: 1
+    save_on_train_epoch_end: null
+tags: dataIAMOnDB_featuresLinInterpol20DxDyDtN_decoderGreedy
+seed: 42
+data:
+  _target_: src.data.online_handwriting_datamodule.IAMOnDBDataModule
+  data_dir: ${paths.data_dir}/datasets/IAM-OnDB
+  batch_size: 64
+  train_val_test_split:
+  - 0.8
+  - 0.2
+  - 0
+  num_workers: 4
+  pin_memory: true
+  limit: -1
+  transform: carbune2020_xytn
+model:
+  _target_: src.models.carbune_module.LitModule1
+  decoder:
+    _target_: src.utils.decoders.GreedyCTCDecoder
+  nodes_per_layer: 64
+  number_of_layers: 3
+  dropout: 0.0
+  optimizer:
+    _target_: torch.optim.Adam
+    _partial_: true
+    lr: 0.0001
+    weight_decay: 0.0
+  scheduler: null
+trainer:
+  _target_: lightning.pytorch.trainer.Trainer
+  default_root_dir: ${paths.output_dir}
+  min_epochs: 1
+  max_epochs: 1000
+  accelerator: gpu
+  devices: 1
+  check_val_every_n_epoch: 50
+  deterministic: false
+  log_every_n_steps: 1
+task_name: train
+train: true
+ckpt_path: null
+experiment_name: dataIAMOnDB_featuresLinInterpol20DxDyDtN_decoderGreedy
+trial_name: final

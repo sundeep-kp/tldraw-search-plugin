@@ -1,0 +1,90 @@
+defaults:
+  - extras: default
+  - paths: default
+  - logger: tensorboard
+  - hydra: default
+  - callbacks:
+    - model_checkpoint
+    # - early_stopping
+    # - measure_speed
+  - _self_
+
+tags: ["experiment2"]
+
+seed: 42
+
+data:
+  _target_: src.data.online_handwriting_datamodule.IAMOnDBDataModule
+  data_dir: ${paths.data_dir}/datasets/IAM-OnDB
+  batch_size: 64
+  train_val_test_split: [10, 0, 0]
+  num_workers: 4
+  pin_memory: True
+  limit: 10
+  transform: "iam_xy"
+
+model:
+  _target_: src.models.carbune_module.LitModule1
+  decoder:
+    _target_: src.utils.decoders.GreedyCTCDecoder
+  nodes_per_layer: 64
+  number_of_layers: 3
+  dropout: 0.0
+  optimizer:
+    _target_: torch.optim.Adam
+    _partial_: true
+    lr: 0.0001
+    weight_decay: 0.0
+  scheduler: null
+
+trainer:
+  _target_: lightning.pytorch.trainer.Trainer
+  default_root_dir: ${paths.output_dir}
+  min_epochs: 1 # prevents early stopping
+  max_epochs: 10000
+  accelerator: gpu
+  devices: 1
+  check_val_every_n_epoch: 50
+  deterministic: False
+  log_every_n_steps: 1
+  #  profiler:
+  #    _target_: pytorch_lightning.profilers.PyTorchProfiler
+  #   on_trace_ready:
+  #      _target_: torch.profiler.tensorboard_trace_handler
+  #      dir_name: "${paths.output_dir}/profiler/"
+  #    schedule:
+  #      _target_: torch.profiler.schedule
+  #      skip_first: 3
+  #      wait: 1
+  #      warmup: 1
+  #      active: 20
+  #    trace_memory: True
+  # profiler:
+  #   _target_: lightning.pytorch.profilers.AdvancedProfiler
+  #   dirpath: .
+  #   filename: test_log
+  # profiler: null
+
+task_name: "train"
+
+train: True
+
+ckpt_path: null
+
+callbacks:
+  model_checkpoint:
+    dirpath: ${paths.output_dir}/checkpoints
+    filename: "epoch={epoch:06d}_step={step:010d}_val_loss={val/loss:.4f}"
+    every_n_epochs: 1
+    save_top_k: 3
+    auto_insert_metric_name: False
+    monitor: "val/loss" # name of the logged metric which determines when model is improving
+    save_last: True
+  # early_stopping:
+  #   monitor: "val/loss" # quantity to be monitored, must be specified !!!
+  #   patience: 20 # number of checks with no improvement after which training will be stopped
+  #   verbose: True
+
+experiment_name: "experiment"
+
+trial_name: "trial"
