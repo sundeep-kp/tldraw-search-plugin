@@ -5,7 +5,16 @@ import { lockZoomIcon } from 'src/assets/data-icons'
 import { TldrawInObsidianPluginProvider } from 'src/contexts/plugin'
 import { useClickAwayListener } from 'src/hooks/useClickAwayListener'
 import useUserPluginSettings from 'src/hooks/useUserPluginSettings'
+import { DEFAULT_ONLINE_HTR_MODEL_CONFIG } from 'src/handwriting/modelConfig'
 import { processExtractedStroke } from 'src/handwriting/pipeline'
+import { createHandwritingRecognizer } from 'src/handwriting/recognizer'
+import {
+	acquireDocumentRecognitionScope,
+	getDocumentRecognitionResults,
+	getRecognitionResult,
+	releaseDocumentRecognitionScope,
+	upsertRecognitionResult,
+} from 'src/handwriting/recognitionResultsStore'
 import { groupNormalizedStrokePayloads } from 'src/handwriting/strokeGrouping'
 import {
 	acquireDocumentStrokePayloadScope,
@@ -19,6 +28,7 @@ import {
 	releaseDocumentWordCandidateScope,
 	setDocumentWordCandidates,
 } from 'src/handwriting/wordCandidateStore'
+import { StrokeGroupCandidate } from 'src/handwriting/strokeGrouping'
 import { StrokeExtractionResult } from 'src/handwriting/types'
 import { useStrokeListener } from 'src/hooks/useStrokeListener'
 import { useTldrawAppEffects } from 'src/hooks/useTldrawAppHook'
@@ -210,6 +220,9 @@ const TldrawApp = ({
 	)
 
 	const [isFocused, setIsFocused] = React.useState(false)
+	const recognizerRef = React.useRef(createHandwritingRecognizer({ engine: 'stub' }))
+	const recognitionDebounceTimerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+	const recognitionRunVersionRef = React.useRef(0)
 	const handwritingDocumentId = React.useMemo(() => {
 		if (store && 'plugin' in store && store.plugin) {
 			return store.plugin.meta.uuid
@@ -245,6 +258,122 @@ const TldrawApp = ({
 		setFocusedEditor: (editor) => setFocusedEditor(true, editor),
 	})
 
+	const onnxModelConfig = React.useMemo(() => {
+		return DEFAULT_ONLINE_HTR_MODEL_CONFIG
+	}, [])
+
+	const recognizerEngine = React.useMemo(() => {
+		const hasModelUrl = typeof onnxModelConfig.modelUrl === 'string' && onnxModelConfig.modelUrl.length > 0
+		const hasAlphabet =
+			Array.isArray(onnxModelConfig.alphabet) && onnxModelConfig.alphabet.length > 0
+		return hasModelUrl && hasAlphabet ? 'onnx-web' : 'stub'
+	}, [onnxModelConfig])
+
+	React.useEffect(() => {
+		const previousRecognizer = recognizerRef.current
+		recognizerRef.current = createHandwritingRecognizer({
+			engine: recognizerEngine,
+			onnxModelConfig,
+		})
+		recognitionRunVersionRef.current += 1
+
+		if (userSettings.debugMode) {
+			console.log('[handwriting] recognizer engine selected', {
+				documentId: handwritingDocumentId,
+				engine: recognizerEngine,
+				hasModelUrl: onnxModelConfig.modelUrl.length > 0,
+				hasAlphabet: onnxModelConfig.alphabet.length > 0,
+			})
+		}
+
+		void previousRecognizer.dispose()
+	}, [handwritingDocumentId, onnxModelConfig, recognizerEngine, userSettings.debugMode])
+
+	const buildGroupFingerprint = React.useCallback((group: StrokeGroupCandidate) => {
+		return `${group.id}:${group.endedAt}:${group.shapeIds.join(',')}`
+	}, [])
+
+	const scheduleRecognition = React.useCallback(
+		(candidates: StrokeGroupCandidate[]) => {
+			if (recognitionDebounceTimerRef.current) {
+				clearTimeout(recognitionDebounceTimerRef.current)
+			}
+
+			recognitionDebounceTimerRef.current = setTimeout(() => {
+				const runVersion = ++recognitionRunVersionRef.current
+				const runStartedAt = Date.now()
+
+				void (async () => {
+					let recognizedCount = 0
+
+					for (const candidate of candidates) {
+						const fingerprint = buildGroupFingerprint(candidate)
+						const existing = getRecognitionResult(handwritingDocumentId, candidate.id)
+						if (existing?.fingerprint === fingerprint && existing.status === 'success') {
+							continue
+						}
+
+						upsertRecognitionResult(handwritingDocumentId, {
+							groupId: candidate.id,
+							shapeIds: candidate.shapeIds,
+							boundingBox: candidate.boundingBox,
+							fingerprint,
+							status: 'pending',
+							updatedAt: Date.now(),
+							candidates: [],
+						})
+
+						try {
+							const recognitionCandidates = await recognizerRef.current.recognize(candidate)
+							if (runVersion !== recognitionRunVersionRef.current) {
+								if (userSettings.debugMode) {
+									console.log('[handwriting] stale recognition result skipped', {
+										documentId: handwritingDocumentId,
+										groupId: candidate.id,
+									})
+								}
+								return
+							}
+
+							upsertRecognitionResult(handwritingDocumentId, {
+								groupId: candidate.id,
+								shapeIds: candidate.shapeIds,
+								boundingBox: candidate.boundingBox,
+								fingerprint,
+								status: 'success',
+								updatedAt: Date.now(),
+								candidates: recognitionCandidates,
+							})
+							recognizedCount += 1
+						} catch (error) {
+							upsertRecognitionResult(handwritingDocumentId, {
+								groupId: candidate.id,
+								shapeIds: candidate.shapeIds,
+								boundingBox: candidate.boundingBox,
+								fingerprint,
+								status: 'error',
+								updatedAt: Date.now(),
+								candidates: [],
+								error: error instanceof Error ? error.message : String(error),
+							})
+						}
+					}
+
+					if (userSettings.debugMode) {
+						console.log('[handwriting] recognition run complete', {
+							documentId: handwritingDocumentId,
+							queuedCandidates: candidates.length,
+							recognizedCandidates: recognizedCount,
+							totalStoredResults: getDocumentRecognitionResults(handwritingDocumentId).length,
+							latencyMs: Date.now() - runStartedAt,
+						})
+					}
+				})()
+			}, 250)
+		},
+		[buildGroupFingerprint, handwritingDocumentId, userSettings.debugMode]
+	)
+
 	const onStrokeExtracted = React.useCallback(
 		(result: StrokeExtractionResult) => {
 			const payload = processExtractedStroke(result)
@@ -254,6 +383,7 @@ const TldrawApp = ({
 			const payloads = getAllNormalizedStrokePayloads(handwritingDocumentId)
 			const groupedCandidates = groupNormalizedStrokePayloads(payloads)
 			setDocumentWordCandidates(handwritingDocumentId, groupedCandidates)
+			scheduleRecognition(groupedCandidates)
 
 			if (userSettings.debugMode) {
 				console.log('[handwriting] normalized stroke payload', {
@@ -286,18 +416,32 @@ const TldrawApp = ({
 				}
 			}
 		},
-		[handwritingDocumentId, userSettings.debugMode]
+		[handwritingDocumentId, scheduleRecognition, userSettings.debugMode]
 	)
 
 	React.useEffect(() => {
 		acquireDocumentStrokePayloadScope(handwritingDocumentId)
 		acquireDocumentWordCandidateScope(handwritingDocumentId)
+		acquireDocumentRecognitionScope(handwritingDocumentId)
 
 		return () => {
+			if (recognitionDebounceTimerRef.current) {
+				clearTimeout(recognitionDebounceTimerRef.current)
+				recognitionDebounceTimerRef.current = undefined
+			}
+			recognitionRunVersionRef.current += 1
+
 			releaseDocumentStrokePayloadScope(handwritingDocumentId)
 			releaseDocumentWordCandidateScope(handwritingDocumentId)
+			releaseDocumentRecognitionScope(handwritingDocumentId)
 		}
 	}, [handwritingDocumentId])
+
+	React.useEffect(() => {
+		return () => {
+			void recognizerRef.current.dispose()
+		}
+	}, [])
 
 	useStrokeListener(editor, {
 		debug: userSettings.debugMode,

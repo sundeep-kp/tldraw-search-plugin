@@ -57,15 +57,82 @@ Last updated: 2026-03-17
 - [x] Retained extraction probes in listener for validation
 - [x] Added normalized payload debug logging in `TldrawApp`
 - [x] Added grouped candidate debug logging in `TldrawApp`
+- [x] Added recognition run debug logging in `TldrawApp`
+- [x] Added `scripts/check-onlinehtr-preprocessor.ts` invariant check script
+- [x] Added `scripts/check-ctc-decoder.ts` decoder behavior check script
+- [x] Added `scripts/check-recognition-lifecycle.ts` smoke script for debounce and stale-run behavior
 - [x] Repeated `npm run build` checks succeeded after each implementation unit
 
 ## Pending Next Steps
 
-- [ ] Add `src/handwriting/recognizer.ts` consuming `wordCandidateStore`
-- [ ] Add recognized-word model and storage contract
+- [ ] Provide real OnlineHTR model artifacts/config (`modelUrl`, `alphabet`) for `onnx-web` runtime
+- [ ] Complete parity tuning of OnlineHTR preprocessor in `src/handwriting/preprocessors/onlineHtrCarbune2020.ts`
 - [ ] Add `src/handwriting/indexer.ts` to write/read markdown handwriting index block
 - [ ] Integrate search/navigation UI with recognized word bounding boxes
 - [ ] Replace temporary probe logs with gated/final logging policy
+
+## Recognizer Plan (OnlineHTR + ONNX Web)
+
+Decision: use `PellelNitram/OnlineHTR` as the model source and integrate via pure plugin runtime (`onnxruntime-web`), no Python sidecar.
+
+### Phase 0 - Freeze Upstream Model Contract
+
+- [ ] Document exact OnlineHTR preprocessing contract (`carbune2020_xytn`) from upstream code.
+- [ ] Confirm channel construction and conventions: `(dx, dy, dt, n)` with first row `(0, 0, 0, 1)`.
+- [ ] Confirm interpolation rule (`POINTS_PER_UNIT_LENGTH = 20`) and stroke/time edge-case handling.
+- [ ] Confirm model IO shapes and semantics: input `[T, N, C]`, output log-probs `[T, N, alphabet+blank]`.
+- [ ] Capture decoder contract parity with upstream greedy CTC implementation.
+
+### Phase 1 - ONNX Export and Parity Harness (External Spike)
+
+- [ ] Export OnlineHTR checkpoint to ONNX with dynamic time axis.
+- [ ] Produce pinned inference artifacts: ONNX model + alphabet mapping + checksum/version metadata.
+- [ ] Run parity tests (PyTorch vs ONNX runtime) on known samples until decoded outputs align.
+- [ ] Treat parity as a hard gate before plugin integration.
+
+### Phase 2 - Plugin Contracts and Recognition Store
+
+- [x] Extend `src/handwriting/types.ts` with recognizer types (`RecognitionResult`, status, metadata).
+- [x] Add `src/handwriting/recognitionResultsStore.ts` with per-document scoped lifecycle (acquire/release).
+- [x] Add stable group fingerprinting (`groupId + endedAt`) to avoid redundant re-recognition.
+
+### Phase 3 - TypeScript Preprocessor Parity
+
+- [x] Add `src/handwriting/preprocessors/onlineHtrCarbune2020.ts`.
+- [ ] Implement parity-safe conversion from grouped strokes to `(dx, dy, dt, n)` sequences.
+- [x] Implement interpolation to 20 points per unit length and NaN/invalid-sample guards.
+- [x] Emit tensor-ready buffers and sequence metadata expected by ONNX inference.
+
+### Phase 4 - ONNX Recognizer Adapter
+
+- [x] Add `src/handwriting/recognizer.ts` engine abstraction.
+- [x] Implement `OnnxOnlineHtrRecognizer` using `onnxruntime-web`.
+- [x] Add model lazy-loading/warm-up and robust error reporting.
+- [x] Implement TS greedy CTC decoder equivalent to upstream behavior.
+- [x] Return ranked recognition candidates with confidence heuristic.
+
+### ONNX Runtime Plumbing (In Repo)
+
+- [x] Add `onnxruntime-web` dependency.
+- [x] Add `src/handwriting/ctcDecoder.ts` for greedy CTC decoding.
+- [x] Add `src/handwriting/modelConfig.ts` for model URL/alphabet/runtime configuration.
+
+### Phase 5 - App Integration (In-Memory Results Only)
+
+- [x] Integrate debounced automatic recognition in `src/components/TldrawApp.tsx`.
+- [x] Consume groups from `wordCandidateStore` and persist outputs in `recognitionResultsStore`.
+- [x] Add stale-run cancellation/versioning to drop outdated async results.
+- [x] Keep scope to in-memory recognition only (defer markdown index writeback).
+- [x] Add guarded recognizer engine selection in `TldrawApp` (`onnx-web` when config is valid, else `stub`).
+
+### Phase 6 - Verification and Hardening
+
+- [x] Validate build and diagnostics after each unit.
+- [x] Add deterministic check scripts for preprocessor + decoder behavior.
+- [x] Add lifecycle smoke check for debounced recognition and stale-run cancellation.
+- [ ] Verify no UI hitching under rapid drawing (debounce effectiveness).
+- [ ] Verify per-document cleanup/lifecycle correctness for recognition results.
+- [ ] Compare plugin ONNX predictions against external parity harness for identical serialized input.
 
 ## Update Protocol
 
