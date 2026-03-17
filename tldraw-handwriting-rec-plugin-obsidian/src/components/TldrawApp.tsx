@@ -5,6 +5,21 @@ import { lockZoomIcon } from 'src/assets/data-icons'
 import { TldrawInObsidianPluginProvider } from 'src/contexts/plugin'
 import { useClickAwayListener } from 'src/hooks/useClickAwayListener'
 import useUserPluginSettings from 'src/hooks/useUserPluginSettings'
+import { processExtractedStroke } from 'src/handwriting/pipeline'
+import { groupNormalizedStrokePayloads } from 'src/handwriting/strokeGrouping'
+import {
+	acquireDocumentStrokePayloadScope,
+	getAllNormalizedStrokePayloads,
+	releaseDocumentStrokePayloadScope,
+	upsertNormalizedStrokePayload,
+} from 'src/handwriting/strokePayloadStore'
+import {
+	acquireDocumentWordCandidateScope,
+	getDocumentWordCandidates,
+	releaseDocumentWordCandidateScope,
+	setDocumentWordCandidates,
+} from 'src/handwriting/wordCandidateStore'
+import { StrokeExtractionResult } from 'src/handwriting/types'
 import { useStrokeListener } from 'src/hooks/useStrokeListener'
 import { useTldrawAppEffects } from 'src/hooks/useTldrawAppHook'
 import TldrawPlugin from 'src/main'
@@ -195,6 +210,12 @@ const TldrawApp = ({
 	)
 
 	const [isFocused, setIsFocused] = React.useState(false)
+	const handwritingDocumentId = React.useMemo(() => {
+		if (store && 'plugin' in store && store.plugin) {
+			return store.plugin.meta.uuid
+		}
+		return 'volatile-document'
+	}, [store])
 
 	const setFocusedEditor = (isMounting: boolean, editor?: Editor) => {
 		const { currTldrawEditor } = plugin
@@ -224,8 +245,63 @@ const TldrawApp = ({
 		setFocusedEditor: (editor) => setFocusedEditor(true, editor),
 	})
 
+	const onStrokeExtracted = React.useCallback(
+		(result: StrokeExtractionResult) => {
+			const payload = processExtractedStroke(result)
+			if (!payload) return
+
+			upsertNormalizedStrokePayload(handwritingDocumentId, payload)
+			const payloads = getAllNormalizedStrokePayloads(handwritingDocumentId)
+			const groupedCandidates = groupNormalizedStrokePayloads(payloads)
+			setDocumentWordCandidates(handwritingDocumentId, groupedCandidates)
+
+			if (userSettings.debugMode) {
+				console.log('[handwriting] normalized stroke payload', {
+					documentId: handwritingDocumentId,
+					shapeId: payload.shapeId,
+					segments: payload.normalizedStrokes.length,
+					totalPoints: payload.normalizedStrokes.reduce(
+						(total, segment) => total + segment.length,
+						0
+					),
+					storedPayloads: payloads.length,
+					groupedCandidates: groupedCandidates.length,
+					storedWordCandidates: getDocumentWordCandidates(handwritingDocumentId).length,
+					bounds: payload.bounds,
+					worldBounds: payload.worldBounds,
+					scale: payload.scale,
+					timestamp: payload.timestamp,
+				})
+
+				if (groupedCandidates.length > 0) {
+					const latestGroup = groupedCandidates[groupedCandidates.length - 1]
+					console.log('[handwriting] grouped stroke candidate', {
+						documentId: handwritingDocumentId,
+						groupId: latestGroup.id,
+						shapeIds: latestGroup.shapeIds,
+						boundingBox: latestGroup.boundingBox,
+						startedAt: latestGroup.startedAt,
+						endedAt: latestGroup.endedAt,
+					})
+				}
+			}
+		},
+		[handwritingDocumentId, userSettings.debugMode]
+	)
+
+	React.useEffect(() => {
+		acquireDocumentStrokePayloadScope(handwritingDocumentId)
+		acquireDocumentWordCandidateScope(handwritingDocumentId)
+
+		return () => {
+			releaseDocumentStrokePayloadScope(handwritingDocumentId)
+			releaseDocumentWordCandidateScope(handwritingDocumentId)
+		}
+	}, [handwritingDocumentId])
+
 	useStrokeListener(editor, {
 		debug: userSettings.debugMode,
+		onStrokeExtracted,
 	})
 
 	const editorContainerRef = useClickAwayListener<HTMLDivElement>({
