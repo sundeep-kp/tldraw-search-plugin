@@ -1,33 +1,91 @@
-export function initializeStrokeListener(editor: any) {
-    console.log("Stroke listener initialized")
+import { extractStroke } from 'src/handwriting/strokeExtractor'
+import { CompletedDrawShape, StrokeListenerOptions } from 'src/handwriting/types'
+import { Editor, HistoryEntry, TLRecord, TLShape, TLShapeId } from 'tldraw'
 
-	const processedShapes = new Set<string>()
+function isDrawShape(shape: TLRecord | TLShape | null | undefined): shape is TLShape {
+	return !!shape && typeof shape === 'object' && 'type' in shape && shape.type === 'draw'
+}
 
-	editor.store.listen((update: any) => {
-        
-		const added = update?.changes?.added
+function isCompletedDrawShape(
+	shape: TLRecord | TLShape | null | undefined
+): shape is CompletedDrawShape {
+	if (!isDrawShape(shape)) return false
 
-		if (!added || Object.keys(added).length === 0) return
-            console.log("ADDED RECORDS", added)
+	const props = (shape as TLShape).props as { isComplete?: boolean } | undefined
+	return props?.isComplete === true
+}
 
-		for (const record of Object.values(added) as any[]) {
+function logDebug(enabled: boolean, message: string, ...args: unknown[]) {
+	if (!enabled) return
+	console.log(`[handwriting] ${message}`, ...args)
+}
 
-			if (
-				record.type === "draw" &&
-				record.props?.isComplete
-			) {
+export function initializeStrokeListener(
+	editor: Editor,
+	{ debug = false, onStrokeExtracted }: StrokeListenerOptions = {}
+) {
+	const processedShapeIds = new Set<TLShapeId>()
+	logDebug(debug, 'stroke listener initialized')
 
-				if (!processedShapes.has(record.id)) {
-
-					processedShapes.add(record.id)
-
-					console.log("Stroke detected:", record.id)
-
+	return editor.store.listen(
+		(update: HistoryEntry<TLRecord>) => {
+			const removed = update?.changes?.removed
+			if (removed) {
+				for (const shapeId of Object.keys(removed) as TLShapeId[]) {
+					processedShapeIds.delete(shapeId)
 				}
-
 			}
 
-		}
+			const addedRecords = Object.values(update?.changes?.added ?? {})
+			const updatedRecords = Object.values(update?.changes?.updated ?? {}).map(([, to]) => to)
 
-	})
+			for (const record of [...addedRecords, ...updatedRecords]) {
+				if (!isCompletedDrawShape(record)) continue
+
+				const shapeId = record.id as TLShapeId
+				if (processedShapeIds.has(shapeId)) {
+					logDebug(debug, 'skipped duplicate draw shape', shapeId)
+					continue
+				}
+
+				const shape = editor.getShape(shapeId)
+				if (!isCompletedDrawShape(shape)) continue
+
+				const strokes = extractStroke(shape)
+				if (strokes.length === 0) {
+					logDebug(debug, 'skipped draw shape with no stroke points', shapeId)
+					continue
+				}
+
+				processedShapeIds.add(shapeId)
+
+				const totalPoints = strokes.reduce((total, segment) => total + segment.length, 0)
+				console.log('[handwriting-probe] extraction success', {
+					shapeId,
+					segments: strokes.length,
+					totalPoints,
+				})
+				console.log('[handwriting-probe] final stroke vector', {
+					shapeId,
+					strokes,
+				})
+
+				logDebug(debug, 'extracted stroke geometry', {
+					shapeId,
+					segments: strokes.length,
+					totalPoints,
+				})
+
+				onStrokeExtracted?.({
+					shapeId,
+					shape,
+					strokes,
+				})
+			}
+		},
+		{
+			scope: 'document',
+			source: 'user',
+		}
+	)
 }

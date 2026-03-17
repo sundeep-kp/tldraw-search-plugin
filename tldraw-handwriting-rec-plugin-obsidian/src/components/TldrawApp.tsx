@@ -4,6 +4,8 @@ import { createRoot } from 'react-dom/client'
 import { lockZoomIcon } from 'src/assets/data-icons'
 import { TldrawInObsidianPluginProvider } from 'src/contexts/plugin'
 import { useClickAwayListener } from 'src/hooks/useClickAwayListener'
+import useUserPluginSettings from 'src/hooks/useUserPluginSettings'
+import { useStrokeListener } from 'src/hooks/useStrokeListener'
 import { useTldrawAppEffects } from 'src/hooks/useTldrawAppHook'
 import TldrawPlugin from 'src/main'
 import { PLUGIN_ACTION_TOGGLE_ZOOM_LOCK, uiOverrides } from 'src/tldraw/ui-overrides'
@@ -33,8 +35,6 @@ import {
 } from 'tldraw'
 import PluginKeyboardShortcutsDialog from './PluginKeyboardShortcutsDialog'
 import PluginQuickActions from './PluginQuickActions'
-
-import { initializeStrokeListener } from "../handwriting/strokeListener"
 
 type TldrawAppOptions = {
 	iconAssetUrls?: TLUiAssetUrlOverrides['icons']
@@ -150,6 +150,8 @@ const TldrawApp = ({
 	},
 	targetDocument: ownerDocument,
 }: TldrawAppProps) => {
+	const userSettings = useUserPluginSettings(plugin.settingsManager)
+
 	const assetUrls = React.useRef({
 		fonts: plugin.getFontOverrides(),
 		icons: {
@@ -222,6 +224,10 @@ const TldrawApp = ({
 		setFocusedEditor: (editor) => setFocusedEditor(true, editor),
 	})
 
+	useStrokeListener(editor, {
+		debug: userSettings.debugMode,
+	})
+
 	const editorContainerRef = useClickAwayListener<HTMLDivElement>({
 		enableClickAwayListener: isFocused,
 		handler(ev) {
@@ -269,9 +275,6 @@ const TldrawApp = ({
 				setFocusedEditor(false, editor)
 			}}
 		>
-
-
-
 			<Tldraw // This component is responsible for rendering the canvas.
 				{...storeProps}
 				assetUrls={assetUrls.current}
@@ -283,13 +286,10 @@ const TldrawApp = ({
 				autoFocus={false}
 				onMount={(editor) => {
 					setAppState(editor) //setAppState is the function that stores the editor instance inside the plugin's internal state.
-					initializeStrokeListener(editor)
-					console.log("Tldraw editor mounted:", editor)
-				}} 				tools={tools}
+				}}
+				tools={tools}
 				className={fbWorkAroundClassname}
 			/>
-
-
 		</div>
 	)
 }
