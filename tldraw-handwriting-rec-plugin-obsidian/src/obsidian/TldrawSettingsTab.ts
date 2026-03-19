@@ -157,6 +157,8 @@ export interface TldrawPluginSettings extends DeprecatedFileDestinationSettings 
 		customTags?: string[]
 	}
 	handwritingRecognition?: {
+		backend?: 'auto' | 'onnx-web' | 'google-ime-js'
+		manualPredictButton?: boolean
 		modelUrl?: string
 		alphabet?: string[] | string
 		inputName?: string
@@ -165,6 +167,9 @@ export interface TldrawPluginSettings extends DeprecatedFileDestinationSettings 
 		singleShapeMode?: boolean
 		allowedCharacters?: string[] | string
 		maxOutputChars?: number
+		googleImeLanguage?: string
+		googleImeNumOfWords?: number
+		googleImeNumOfReturn?: number
 	}
 }
 
@@ -198,6 +203,8 @@ export const DEFAULT_SETTINGS = {
 		insertTags: true,
 	},
 	handwritingRecognition: {
+		backend: 'auto',
+		manualPredictButton: true,
 		modelUrl: '',
 		alphabet: [],
 		inputName: 'input',
@@ -206,6 +213,9 @@ export const DEFAULT_SETTINGS = {
 		singleShapeMode: false,
 		allowedCharacters: [],
 		maxOutputChars: 0,
+		googleImeLanguage: 'en',
+		googleImeNumOfWords: 0,
+		googleImeNumOfReturn: 5,
 	},
 } as const satisfies Partial<TldrawPluginSettings>
 

@@ -1,4 +1,4 @@
-import { ExtraButton, Text, Toggle } from '@obsidian-plugin-toolkit/react/components'
+import { Dropdown, ExtraButton, Text, Toggle } from '@obsidian-plugin-toolkit/react/components'
 import { Group, Setting } from '@obsidian-plugin-toolkit/react/components/setting/group'
 import React, { useCallback, useMemo } from 'react'
 import useSettingsManager from 'src/hooks/useSettingsManager'
@@ -21,6 +21,8 @@ function HandwritingRecognitionSettingsGroup() {
 	const updateRecognitionField = useCallback(
 		async (
 			field:
+				| 'backend'
+				| 'manualPredictButton'
 				| 'modelUrl'
 				| 'alphabet'
 				| 'inputName'
@@ -28,7 +30,10 @@ function HandwritingRecognitionSettingsGroup() {
 				| 'blankIndex'
 				| 'singleShapeMode'
 				| 'allowedCharacters'
-				| 'maxOutputChars',
+				| 'maxOutputChars'
+				| 'googleImeLanguage'
+				| 'googleImeNumOfWords'
+				| 'googleImeNumOfReturn',
 			value: string | number | boolean
 		) => {
 			const current = settingsManager.settings.handwritingRecognition ?? {}
@@ -44,6 +49,8 @@ function HandwritingRecognitionSettingsGroup() {
 	const resetModelField = useCallback(
 		async (
 			field:
+				| 'backend'
+				| 'manualPredictButton'
 				| 'modelUrl'
 				| 'alphabet'
 				| 'inputName'
@@ -52,6 +59,9 @@ function HandwritingRecognitionSettingsGroup() {
 				| 'singleShapeMode'
 				| 'allowedCharacters'
 				| 'maxOutputChars'
+				| 'googleImeLanguage'
+				| 'googleImeNumOfWords'
+				| 'googleImeNumOfReturn'
 		) => {
 			const defaults = DEFAULT_SETTINGS.handwritingRecognition
 			const current = settingsManager.settings.handwritingRecognition ?? {}
@@ -124,6 +134,45 @@ function HandwritingRecognitionSettingsGroup() {
 		[updateRecognitionField]
 	)
 
+	const onBackendChange = useCallback(
+		async (value: string) => {
+			await updateRecognitionField('backend', value)
+		},
+		[updateRecognitionField]
+	)
+
+	const onManualPredictButtonChange = useCallback(
+		async (value: boolean) => {
+			await updateRecognitionField('manualPredictButton', value)
+		},
+		[updateRecognitionField]
+	)
+
+	const onGoogleImeLanguageChange = useCallback(
+		async (value: string) => {
+			await updateRecognitionField('googleImeLanguage', value)
+		},
+		[updateRecognitionField]
+	)
+
+	const onGoogleImeNumOfWordsChange = useCallback(
+		async (value: string) => {
+			const parsed = Number.parseInt(value, 10)
+			if (Number.isNaN(parsed)) return
+			await updateRecognitionField('googleImeNumOfWords', parsed)
+		},
+		[updateRecognitionField]
+	)
+
+	const onGoogleImeNumOfReturnChange = useCallback(
+		async (value: string) => {
+			const parsed = Number.parseInt(value, 10)
+			if (Number.isNaN(parsed)) return
+			await updateRecognitionField('googleImeNumOfReturn', parsed)
+		},
+		[updateRecognitionField]
+	)
+
 	const alphabetText = useMemo(() => {
 		const configured = settings.handwritingRecognition?.alphabet
 		if (Array.isArray(configured)) return configured.join(',')
@@ -140,6 +189,105 @@ function HandwritingRecognitionSettingsGroup() {
 
 	return (
 		<>
+			<Setting
+				slots={{
+					name: 'Recognizer backend',
+					desc: 'Select recognition backend. Auto preserves current behavior: ONNX when model config is ready, otherwise stub.',
+					control: (
+						<>
+							<Dropdown
+								options={{
+									auto: 'Auto (existing behavior)',
+									'onnx-web': 'ONNX (local model)',
+									'google-ime-js': 'Google IME (handwriting.js style)',
+								}}
+								value={settings.handwritingRecognition?.backend ?? 'auto'}
+								onChange={onBackendChange}
+							/>
+							<ExtraButton icon="reset" tooltip="reset" onClick={() => resetModelField('backend')} />
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Manual predict button',
+					desc: 'When enabled, recognition runs only when you click Predict now in the canvas. When disabled, recognition runs automatically after each new stroke.',
+					control: (
+						<>
+							<Toggle
+								value={settings.handwritingRecognition?.manualPredictButton ?? true}
+								onChange={onManualPredictButtonChange}
+							/>
+							<ExtraButton
+								icon="reset"
+								tooltip="reset"
+								onClick={() => resetModelField('manualPredictButton')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Google IME language',
+					desc: 'Language code for Google IME requests (e.g. en, ja, zh_TW). Used only by Google IME backend.',
+					control: (
+						<>
+							<Text
+								value={settings.handwritingRecognition?.googleImeLanguage ?? 'en'}
+								placeholder={DEFAULT_SETTINGS.handwritingRecognition.googleImeLanguage}
+								onChange={onGoogleImeLanguageChange}
+							/>
+							<ExtraButton
+								icon="reset"
+								tooltip="reset"
+								onClick={() => resetModelField('googleImeLanguage')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Google IME numOfWords',
+					desc: 'Optional length filter for Google IME candidates. 0 disables filtering.',
+					control: (
+						<>
+							<Text
+								value={`${settings.handwritingRecognition?.googleImeNumOfWords ?? ''}`}
+								placeholder={`${DEFAULT_SETTINGS.handwritingRecognition.googleImeNumOfWords}`}
+								onChange={onGoogleImeNumOfWordsChange}
+							/>
+							<ExtraButton
+								icon="reset"
+								tooltip="reset"
+								onClick={() => resetModelField('googleImeNumOfWords')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Google IME numOfReturn',
+					desc: 'Maximum number of returned Google IME candidates. 0 means no explicit cap.',
+					control: (
+						<>
+							<Text
+								value={`${settings.handwritingRecognition?.googleImeNumOfReturn ?? ''}`}
+								placeholder={`${DEFAULT_SETTINGS.handwritingRecognition.googleImeNumOfReturn}`}
+								onChange={onGoogleImeNumOfReturnChange}
+							/>
+							<ExtraButton
+								icon="reset"
+								tooltip="reset"
+								onClick={() => resetModelField('googleImeNumOfReturn')}
+							/>
+						</>
+					),
+				}}
+			/>
 			<Setting
 				slots={{
 					name: 'Model URL',
@@ -270,7 +418,7 @@ function HandwritingRecognitionSettingsGroup() {
 			<Setting
 				slots={{
 					name: 'Resolver status',
-					desc: 'Preview of normalized config readiness used by recognizer engine selection.',
+					desc: 'Preview of ONNX config readiness. Auto backend uses this to choose ONNX or stub.',
 					control: (
 						<Text
 							readonly

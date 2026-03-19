@@ -263,9 +263,30 @@ const TldrawApp = ({
 		return resolveOnlineHtrModelConfig(userSettings.handwritingRecognition)
 	}, [userSettings.handwritingRecognition])
 
+	const googleImeConfig = React.useMemo(() => {
+		const source = userSettings.handwritingRecognition
+		const language =
+			typeof source?.googleImeLanguage === 'string' && source.googleImeLanguage.trim().length > 0
+				? source.googleImeLanguage.trim()
+				: 'en'
+		const numOfWords =
+			typeof source?.googleImeNumOfWords === 'number' && Number.isFinite(source.googleImeNumOfWords)
+				? Math.max(0, Math.floor(source.googleImeNumOfWords))
+				: 0
+		const numOfReturn =
+			typeof source?.googleImeNumOfReturn === 'number' && Number.isFinite(source.googleImeNumOfReturn)
+				? Math.max(0, Math.floor(source.googleImeNumOfReturn))
+				: 5
+
+		return { language, numOfWords, numOfReturn }
+	}, [userSettings.handwritingRecognition])
+
 	const recognizerEngine = React.useMemo(() => {
+		const preferred = userSettings.handwritingRecognition?.backend ?? 'auto'
+		if (preferred === 'google-ime-js') return 'google-ime-js'
+		if (preferred === 'onnx-web') return 'onnx-web'
 		return isOnlineHtrModelConfigReady(onnxModelConfig) ? 'onnx-web' : 'stub'
-	}, [onnxModelConfig])
+	}, [onnxModelConfig, userSettings.handwritingRecognition?.backend])
 
 	const loadModelBytes = React.useCallback(
 		async (modelUrl: string) => {
@@ -320,6 +341,7 @@ const TldrawApp = ({
 		recognizerRef.current = createHandwritingRecognizer({
 			engine: recognizerEngine,
 			onnxModelConfig,
+			googleImeConfig,
 			loadModelBytes,
 		})
 		recognitionRunVersionRef.current += 1
@@ -327,18 +349,71 @@ const TldrawApp = ({
 		if (userSettings.debugMode) {
 			console.log('[handwriting] recognizer engine selected', {
 				documentId: handwritingDocumentId,
+				backendPreference: userSettings.handwritingRecognition?.backend ?? 'auto',
 				engine: recognizerEngine,
 				hasModelUrl: onnxModelConfig.modelUrl.length > 0,
 				hasAlphabet: onnxModelConfig.alphabet.length > 0,
+				googleImeLanguage: googleImeConfig.language,
 			})
 		}
 
 		void previousRecognizer.dispose()
-	}, [handwritingDocumentId, loadModelBytes, onnxModelConfig, recognizerEngine, userSettings.debugMode])
+	}, [
+		handwritingDocumentId,
+		googleImeConfig,
+		loadModelBytes,
+		onnxModelConfig,
+		recognizerEngine,
+		userSettings.debugMode,
+		userSettings.handwritingRecognition?.backend,
+	])
 
 	const buildGroupFingerprint = React.useCallback((group: StrokeGroupCandidate) => {
 		return `${group.id}:${group.endedAt}:${group.shapeIds.join(',')}`
 	}, [])
+
+	const buildManualMergedCandidate = React.useCallback(
+		(payloads: ReturnType<typeof getAllNormalizedStrokePayloads>): StrokeGroupCandidate[] => {
+			if (payloads.length === 0) return []
+
+			const sortedPayloads = [...payloads].sort((a, b) => a.timestamp - b.timestamp)
+			const mergedBounds = sortedPayloads.reduce((acc, payload) => {
+				const b = payload.worldBounds
+				if (!acc) {
+					return {
+						minX: b.minX,
+						minY: b.minY,
+						maxX: b.maxX,
+						maxY: b.maxY,
+					}
+				}
+				return {
+					minX: Math.min(acc.minX, b.minX),
+					minY: Math.min(acc.minY, b.minY),
+					maxX: Math.max(acc.maxX, b.maxX),
+					maxY: Math.max(acc.maxY, b.maxY),
+				}
+			}, null as { minX: number; minY: number; maxX: number; maxY: number } | null)
+
+			if (!mergedBounds) return []
+
+			return [
+				{
+					id: `manual-group-${handwritingDocumentId}`,
+					shapeIds: sortedPayloads.map((payload) => payload.shapeId),
+					payloads: sortedPayloads,
+					boundingBox: {
+						...mergedBounds,
+						width: mergedBounds.maxX - mergedBounds.minX,
+						height: mergedBounds.maxY - mergedBounds.minY,
+					},
+					startedAt: sortedPayloads[0].timestamp,
+					endedAt: sortedPayloads[sortedPayloads.length - 1].timestamp,
+				},
+			]
+		},
+		[handwritingDocumentId]
+	)
 
 	const scheduleRecognition = React.useCallback(
 		(candidates: StrokeGroupCandidate[]) => {
@@ -465,6 +540,20 @@ const TldrawApp = ({
 		[buildGroupFingerprint, handwritingDocumentId, userSettings.debugMode]
 	)
 
+	const triggerManualRecognition = React.useCallback(() => {
+		const groupedCandidates = getDocumentWordCandidates(handwritingDocumentId)
+		if (groupedCandidates.length === 0) {
+			if (userSettings.debugMode) {
+				console.log('[handwriting] manual recognition skipped: no grouped candidates', {
+					documentId: handwritingDocumentId,
+				})
+			}
+			return
+		}
+
+		scheduleRecognition(groupedCandidates)
+	}, [handwritingDocumentId, scheduleRecognition, userSettings.debugMode])
+
 	const onStrokeExtracted = React.useCallback(
 		(result: StrokeExtractionResult) => {
 			const payload = processExtractedStroke(result)
@@ -472,15 +561,20 @@ const TldrawApp = ({
 
 			upsertNormalizedStrokePayload(handwritingDocumentId, payload)
 			const payloads = getAllNormalizedStrokePayloads(handwritingDocumentId)
-			const groupedCandidates = userSettings.handwritingRecognition?.singleShapeMode
-				? groupNormalizedStrokePayloads(payloads, {
-						maxTimeDeltaMs: 0,
-						maxHorizontalGapPx: 0,
-						maxVerticalCenterDistancePx: 0,
-				  })
-				: groupNormalizedStrokePayloads(payloads)
+			const manualMode = !!userSettings.handwritingRecognition?.manualPredictButton
+			const groupedCandidates = manualMode
+				? buildManualMergedCandidate(payloads)
+				: userSettings.handwritingRecognition?.singleShapeMode
+					? groupNormalizedStrokePayloads(payloads, {
+							maxTimeDeltaMs: 0,
+							maxHorizontalGapPx: 0,
+							maxVerticalCenterDistancePx: 0,
+					  })
+					: groupNormalizedStrokePayloads(payloads)
 			setDocumentWordCandidates(handwritingDocumentId, groupedCandidates)
-			scheduleRecognition(groupedCandidates)
+			if (!manualMode) {
+				scheduleRecognition(groupedCandidates)
+			}
 
 			if (userSettings.debugMode) {
 				console.log('[handwriting] normalized stroke payload', {
@@ -514,9 +608,11 @@ const TldrawApp = ({
 			}
 		},
 		[
+			buildManualMergedCandidate,
 			handwritingDocumentId,
 			scheduleRecognition,
 			userSettings.debugMode,
+			userSettings.handwritingRecognition?.manualPredictButton,
 			userSettings.handwritingRecognition?.singleShapeMode,
 		]
 	)
@@ -597,6 +693,11 @@ const TldrawApp = ({
 				setFocusedEditor(false, editor)
 			}}
 		>
+			{userSettings.handwritingRecognition?.manualPredictButton ? (
+				<button className="ptl-handwriting-predict-button" onClick={triggerManualRecognition}>
+					Predict now
+				</button>
+			) : null}
 			<Tldraw // This component is responsible for rendering the canvas.
 				{...storeProps}
 				assetUrls={assetUrls.current}

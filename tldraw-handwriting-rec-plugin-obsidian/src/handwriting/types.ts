@@ -66,16 +66,23 @@ export type RecognitionResult = {
 	error?: string
 }
 
+export type GoogleImeRecognizerConfig = {
+	language?: string
+	numOfWords?: number
+	numOfReturn?: number
+}
+
 export interface HandwritingRecognizer {
 	recognize(group: StrokeGroupCandidate): Promise<RecognitionCandidate[]>
 	isReady(): boolean
 	dispose(): Promise<void>
 }
 
-export type RecognizerEngine = 'stub' | 'onnx-web'
+export type RecognizerEngine = 'stub' | 'onnx-web' | 'google-ime-js'
 
 export type RecognizerFactoryOptions = {
 	engine?: RecognizerEngine
 	onnxModelConfig?: OnlineHtrModelConfig
+	googleImeConfig?: GoogleImeRecognizerConfig
 	loadModelBytes?: (modelUrl: string) => Promise<Uint8Array | undefined>
 }

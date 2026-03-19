@@ -3,6 +3,7 @@ import { decodeGreedyCtc } from 'src/handwriting/ctcDecoder'
 import { DEFAULT_ONLINE_HTR_MODEL_CONFIG, OnlineHtrModelConfig } from 'src/handwriting/modelConfig'
 import { preprocessGroupForOnlineHtr } from 'src/handwriting/preprocessors/onlineHtrCarbune2020'
 import {
+	GoogleImeRecognizerConfig,
 	HandwritingRecognizer,
 	RecognitionCandidate,
 	RecognizerFactoryOptions,
@@ -12,6 +13,126 @@ type OnnxRuntimeWebModule = typeof import('onnxruntime-web')
 
 const ORT_DIST_VERSION = '1.24.3'
 const ORT_WASM_DIST_BASE = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_DIST_VERSION}/dist/`
+const GOOGLE_IME_ENDPOINT =
+	'https://www.google.com.tw/inputtools/request?ime=handwriting&app=mobilesearch&cs=1&oe=UTF-8'
+
+class GoogleImeRecognizer implements HandwritingRecognizer {
+	constructor(
+		private readonly config: GoogleImeRecognizerConfig = {
+			language: 'en',
+			numOfWords: 0,
+			numOfReturn: 5,
+		}
+	) {}
+
+	isReady() {
+		return true
+	}
+
+	private buildTrace(group: StrokeGroupCandidate): number[][][] {
+		const payloads = [...group.payloads].sort((a, b) => a.timestamp - b.timestamp)
+		const trace: number[][][] = []
+
+		for (const payload of payloads) {
+			for (const stroke of payload.rawStrokes) {
+				if (!Array.isArray(stroke) || stroke.length === 0) continue
+
+				const xCoords: number[] = []
+				const yCoords: number[] = []
+
+				for (const point of stroke) {
+					xCoords.push(payload.shapePosition.x + point.x)
+					yCoords.push(payload.shapePosition.y + point.y)
+				}
+
+				if (xCoords.length > 0) {
+					trace.push([xCoords, yCoords, []])
+				}
+			}
+		}
+
+		return trace
+	}
+
+	async recognize(group: StrokeGroupCandidate): Promise<RecognitionCandidate[]> {
+		const trace = this.buildTrace(group)
+		if (trace.length === 0) {
+			throw new Error('No stroke data available for Google IME recognizer request.')
+		}
+
+		const language = (this.config.language ?? 'en').trim() || 'en'
+		const numOfWords = Math.max(0, Math.floor(this.config.numOfWords ?? 0))
+		const numOfReturn = Math.max(0, Math.floor(this.config.numOfReturn ?? 5))
+
+		const payload = {
+			options: 'enable_pre_space',
+			requests: [
+				{
+					writing_guide: {
+						writing_area_width: Math.max(1, Math.ceil(group.boundingBox.width || 1)),
+						writing_area_height: Math.max(1, Math.ceil(group.boundingBox.height || 1)),
+					},
+					ink: trace,
+					language,
+				},
+			],
+		}
+
+		const controller = new AbortController()
+		const timeout = setTimeout(() => controller.abort(), 10000)
+		try {
+			const response = await fetch(GOOGLE_IME_ENDPOINT, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify(payload),
+				signal: controller.signal,
+			})
+
+			if (!response.ok) {
+				throw new Error(`Google IME request failed (${response.status}).`)
+			}
+
+			const data = (await response.json()) as unknown
+			if (Array.isArray(data) && data.length === 1) {
+				throw new Error(String(data[0]))
+			}
+
+			const rawCandidates =
+				Array.isArray(data) && Array.isArray(data[1]) && Array.isArray(data[1][0])
+					? data[1][0][1]
+					: []
+
+			if (!Array.isArray(rawCandidates)) {
+				throw new Error('Unexpected Google IME response shape.')
+			}
+
+			let textCandidates = rawCandidates.filter((c): c is string => typeof c === 'string')
+
+			if (numOfWords > 0) {
+				textCandidates = textCandidates.filter((candidate) => candidate.length === numOfWords)
+			}
+			if (numOfReturn > 0) {
+				textCandidates = textCandidates.slice(0, numOfReturn)
+			}
+
+			return textCandidates.map((text, index) => ({
+				text,
+				confidence: Math.max(0, 1 - index * 0.1),
+			}))
+		} catch (error) {
+			if (error instanceof Error && error.name === 'AbortError') {
+				throw new Error('Google IME request timed out.')
+			}
+			throw error
+		} finally {
+			clearTimeout(timeout)
+		}
+	}
+
+	async dispose(): Promise<void> {
+		return
+	}
+}
 
 class StubRecognizer implements HandwritingRecognizer {
 	isReady() {
@@ -172,11 +293,13 @@ class OnnxWebRecognizer implements HandwritingRecognizer {
 }
 
 export function createHandwritingRecognizer(
-	{ engine = 'stub', onnxModelConfig, loadModelBytes }: RecognizerFactoryOptions = {}
+	{ engine = 'stub', onnxModelConfig, googleImeConfig, loadModelBytes }: RecognizerFactoryOptions = {}
 ): HandwritingRecognizer {
 	switch (engine) {
 		case 'onnx-web':
 			return new OnnxWebRecognizer(onnxModelConfig ?? DEFAULT_ONLINE_HTR_MODEL_CONFIG, loadModelBytes)
+		case 'google-ime-js':
+			return new GoogleImeRecognizer(googleImeConfig)
 		case 'stub':
 		default:
 			return new StubRecognizer()
