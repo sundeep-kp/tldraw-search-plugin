@@ -43,11 +43,17 @@ def main(args: dict) -> None:
     BASE_PATH = Path(args['model_folder_path'])
     CHECKPOINT_PATH = get_best_checkpoint_path( BASE_PATH / 'checkpoints' )
 
-    model = LitModule1.load_from_checkpoint(CHECKPOINT_PATH)
+    # This checkpoint stores non-tensor objects (e.g., decoder config/classes),
+    # so PyTorch >=2.6 needs weights_only=False for trusted local files.
+    model = LitModule1.load_from_checkpoint(CHECKPOINT_PATH, weights_only=False)
 
     model.eval()
 
-    checkpoint = torch.load(CHECKPOINT_PATH, map_location=lambda storage, loc: storage)
+    checkpoint = torch.load(
+        CHECKPOINT_PATH,
+        map_location=lambda storage, loc: storage,
+        weights_only=False,
+    )
 
     alphabet = load_alphabet(BASE_PATH / 'alphabet.json')
     alphabet_mapper = AlphabetMapper( alphabet )

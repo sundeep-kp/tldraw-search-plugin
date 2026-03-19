@@ -1,0 +1,85 @@
+test with a,a,a , b,b,b, c,c,c in order
+app.js:1 Obsidian Developer Console
+plugin:obsidian-git:402 loading Git plugin: v2.38.0
+plugin:tldraw:40462 Attaching to Obsidian development server at http://localhost:5173/
+plugin:tldraw:40497 Connecting to Obsidian development server
+plugin:tldraw:40499 Event source created EventSource {url: 'http://localhost:5173/esbuild', withCredentials: false, readyState: 0, onopen: null, onmessage: null, …}
+plugin:tldraw:40568 Adding setting tab {settingTab: TldrawSettingsTab}
+plugin:tldraw:40536 Obsidian development server connection opened
+plugin:tldraw:146847 {assets: _ObsidianTLAssetStore}
+plugin:tldraw:138758 [handwriting] recognizer engine selected {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', engine: 'onnx-web', hasModelUrl: true, hasAlphabet: true}
+plugin:tldraw:140947 undefined
+plugin:tldraw:140948 {viewState: {…}}
+plugin:tldraw:137810 [handwriting] stroke listener initialized
+plugin:tldraw:137841 [handwriting-probe] extraction success {shapeId: 'shape:Di-UexcmLOZZpmRQpXL7X', segments: 1, totalPoints: 92}
+plugin:tldraw:137846 [handwriting-probe] final stroke vector {shapeId: 'shape:Di-UexcmLOZZpmRQpXL7X', strokes: Array(1)}
+plugin:tldraw:137810 [handwriting] extracted stroke geometry {shapeId: 'shape:Di-UexcmLOZZpmRQpXL7X', segments: 1, totalPoints: 92}
+plugin:tldraw:138892 [handwriting] normalized stroke payload {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', shapeId: 'shape:Di-UexcmLOZZpmRQpXL7X', segments: 1, totalPoints: 92, storedPayloads: 1, …}
+plugin:tldraw:138910 [handwriting] grouped stroke candidate {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905884253-shape:Di-UexcmLOZZpmRQpXL7X', shapeIds: Array(1), boundingBox: {…}, startedAt: 1773905884253, …}
+plugin:tldraw:138817 [handwriting] recognition success {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905884253-shape:Di-UexcmLOZZpmRQpXL7X', bestText: 'T', bestConfidence: 0.9816167233967401, candidateCount: 1}
+plugin:tldraw:138825 [handwriting] recognition parity sample {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905884253-shape:Di-UexcmLOZZpmRQpXL7X', shapeIds: Array(1), prediction: 'T', confidence: 0.9816167233967401, …}
+plugin:tldraw:138864 [handwriting] recognition run complete {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', queuedCandidates: 1, recognizedCandidates: 1, totalStoredResults: 1, latencyMs: 471, …}
+plugin:tldraw:137841 [handwriting-probe] extraction success {shapeId: 'shape:3I-nNSboCexMHUAFJO4Pr', segments: 1, totalPoints: 81}
+plugin:tldraw:137846 [handwriting-probe] final stroke vector {shapeId: 'shape:3I-nNSboCexMHUAFJO4Pr', strokes: Array(1)}
+plugin:tldraw:137810 [handwriting] extracted stroke geometry {shapeId: 'shape:3I-nNSboCexMHUAFJO4Pr', segments: 1, totalPoints: 81}
+plugin:tldraw:138892 [handwriting] normalized stroke payload {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', shapeId: 'shape:3I-nNSboCexMHUAFJO4Pr', segments: 1, totalPoints: 81, storedPayloads: 2, …}
+plugin:tldraw:138910 [handwriting] grouped stroke candidate {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905885109-shape:3I-nNSboCexMHUAFJO4Pr', shapeIds: Array(1), boundingBox: {…}, startedAt: 1773905885109, …}
+plugin:tldraw:138817 [handwriting] recognition success {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905885109-shape:3I-nNSboCexMHUAFJO4Pr', bestText: 'T', bestConfidence: 0.9925198247271325, candidateCount: 1}
+plugin:tldraw:138825 [handwriting] recognition parity sample {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905885109-shape:3I-nNSboCexMHUAFJO4Pr', shapeIds: Array(1), prediction: 'T', confidence: 0.9925198247271325, …}
+plugin:tldraw:138864 [handwriting] recognition run complete {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', queuedCandidates: 2, recognizedCandidates: 1, totalStoredResults: 2, latencyMs: 11, …}
+plugin:tldraw:137841 [handwriting-probe] extraction success {shapeId: 'shape:HUzSj4tLf4kw2N0hSO6Ls', segments: 1, totalPoints: 81}
+plugin:tldraw:137846 [handwriting-probe] final stroke vector {shapeId: 'shape:HUzSj4tLf4kw2N0hSO6Ls', strokes: Array(1)}
+plugin:tldraw:137810 [handwriting] extracted stroke geometry {shapeId: 'shape:HUzSj4tLf4kw2N0hSO6Ls', segments: 1, totalPoints: 81}
+plugin:tldraw:138892 [handwriting] normalized stroke payload {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', shapeId: 'shape:HUzSj4tLf4kw2N0hSO6Ls', segments: 1, totalPoints: 81, storedPayloads: 3, …}
+plugin:tldraw:138910 [handwriting] grouped stroke candidate {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905887392-shape:HUzSj4tLf4kw2N0hSO6Ls', shapeIds: Array(1), boundingBox: {…}, startedAt: 1773905887392, …}
+plugin:tldraw:138817 [handwriting] recognition success {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905887392-shape:HUzSj4tLf4kw2N0hSO6Ls', bestText: 'M', bestConfidence: 0.9848081598411433, candidateCount: 1}
+plugin:tldraw:138825 [handwriting] recognition parity sample {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905887392-shape:HUzSj4tLf4kw2N0hSO6Ls', shapeIds: Array(1), prediction: 'M', confidence: 0.9848081598411433, …}
+plugin:tldraw:138864 [handwriting] recognition run complete {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', queuedCandidates: 3, recognizedCandidates: 1, totalStoredResults: 3, latencyMs: 10, …}
+plugin:tldraw:137841 [handwriting-probe] extraction success {shapeId: 'shape:yPC6alvByT44AObPabnTW', segments: 1, totalPoints: 99}
+plugin:tldraw:137846 [handwriting-probe] final stroke vector {shapeId: 'shape:yPC6alvByT44AObPabnTW', strokes: Array(1)}
+plugin:tldraw:137810 [handwriting] extracted stroke geometry {shapeId: 'shape:yPC6alvByT44AObPabnTW', segments: 1, totalPoints: 99}
+plugin:tldraw:138892 [handwriting] normalized stroke payload {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', shapeId: 'shape:yPC6alvByT44AObPabnTW', segments: 1, totalPoints: 99, storedPayloads: 4, …}
+plugin:tldraw:138910 [handwriting] grouped stroke candidate {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905888763-shape:yPC6alvByT44AObPabnTW', shapeIds: Array(1), boundingBox: {…}, startedAt: 1773905888763, …}
+plugin:tldraw:138817 [handwriting] recognition success {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905888763-shape:yPC6alvByT44AObPabnTW', bestText: 'M', bestConfidence: 0.982921802953987, candidateCount: 1}
+plugin:tldraw:138825 [handwriting] recognition parity sample {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905888763-shape:yPC6alvByT44AObPabnTW', shapeIds: Array(1), prediction: 'M', confidence: 0.982921802953987, …}
+plugin:tldraw:138864 [handwriting] recognition run complete {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', queuedCandidates: 4, recognizedCandidates: 1, totalStoredResults: 4, latencyMs: 10, …}
+plugin:tldraw:137841 [handwriting-probe] extraction success {shapeId: 'shape:basNfjQOCHirDmY8Y4dCX', segments: 1, totalPoints: 98}
+plugin:tldraw:137846 [handwriting-probe] final stroke vector {shapeId: 'shape:basNfjQOCHirDmY8Y4dCX', strokes: Array(1)}
+plugin:tldraw:137810 [handwriting] extracted stroke geometry {shapeId: 'shape:basNfjQOCHirDmY8Y4dCX', segments: 1, totalPoints: 98}
+plugin:tldraw:138892 [handwriting] normalized stroke payload {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', shapeId: 'shape:basNfjQOCHirDmY8Y4dCX', segments: 1, totalPoints: 98, storedPayloads: 5, …}
+plugin:tldraw:138910 [handwriting] grouped stroke candidate {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905889654-shape:basNfjQOCHirDmY8Y4dCX', shapeIds: Array(1), boundingBox: {…}, startedAt: 1773905889654, …}
+plugin:tldraw:138817 [handwriting] recognition success {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905889654-shape:basNfjQOCHirDmY8Y4dCX', bestText: 'M', bestConfidence: 0.9899409116319376, candidateCount: 1}
+plugin:tldraw:138825 [handwriting] recognition parity sample {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905889654-shape:basNfjQOCHirDmY8Y4dCX', shapeIds: Array(1), prediction: 'M', confidence: 0.9899409116319376, …}
+plugin:tldraw:138864 [handwriting] recognition run complete {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', queuedCandidates: 5, recognizedCandidates: 1, totalStoredResults: 5, latencyMs: 9, …}
+plugin:tldraw:137841 [handwriting-probe] extraction success {shapeId: 'shape:9lQCGg6sLMwazLcllRd_L', segments: 1, totalPoints: 96}
+plugin:tldraw:137846 [handwriting-probe] final stroke vector {shapeId: 'shape:9lQCGg6sLMwazLcllRd_L', strokes: Array(1)}
+plugin:tldraw:137810 [handwriting] extracted stroke geometry {shapeId: 'shape:9lQCGg6sLMwazLcllRd_L', segments: 1, totalPoints: 96}
+plugin:tldraw:138892 [handwriting] normalized stroke payload {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', shapeId: 'shape:9lQCGg6sLMwazLcllRd_L', segments: 1, totalPoints: 96, storedPayloads: 6, …}
+plugin:tldraw:138910 [handwriting] grouped stroke candidate {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905890490-shape:9lQCGg6sLMwazLcllRd_L', shapeIds: Array(1), boundingBox: {…}, startedAt: 1773905890490, …}
+plugin:tldraw:138817 [handwriting] recognition success {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905890490-shape:9lQCGg6sLMwazLcllRd_L', bestText: '1', bestConfidence: 0.9878850915974344, candidateCount: 1}
+plugin:tldraw:138825 [handwriting] recognition parity sample {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905890490-shape:9lQCGg6sLMwazLcllRd_L', shapeIds: Array(1), prediction: '1', confidence: 0.9878850915974344, …}
+plugin:tldraw:138864 [handwriting] recognition run complete {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', queuedCandidates: 6, recognizedCandidates: 1, totalStoredResults: 6, latencyMs: 8, …}
+plugin:tldraw:137841 [handwriting-probe] extraction success {shapeId: 'shape:Ao7m4CiAI1kbH-cvT3F1q', segments: 1, totalPoints: 73}
+plugin:tldraw:137846 [handwriting-probe] final stroke vector {shapeId: 'shape:Ao7m4CiAI1kbH-cvT3F1q', strokes: Array(1)}
+plugin:tldraw:137810 [handwriting] extracted stroke geometry {shapeId: 'shape:Ao7m4CiAI1kbH-cvT3F1q', segments: 1, totalPoints: 73}
+plugin:tldraw:138892 [handwriting] normalized stroke payload {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', shapeId: 'shape:Ao7m4CiAI1kbH-cvT3F1q', segments: 1, totalPoints: 73, storedPayloads: 7, …}
+plugin:tldraw:138910 [handwriting] grouped stroke candidate {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905891637-shape:Ao7m4CiAI1kbH-cvT3F1q', shapeIds: Array(1), boundingBox: {…}, startedAt: 1773905891637, …}
+plugin:tldraw:138817 [handwriting] recognition success {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905891637-shape:Ao7m4CiAI1kbH-cvT3F1q', bestText: 'T', bestConfidence: 0.9951665136382486, candidateCount: 1}
+plugin:tldraw:138825 [handwriting] recognition parity sample {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905891637-shape:Ao7m4CiAI1kbH-cvT3F1q', shapeIds: Array(1), prediction: 'T', confidence: 0.9951665136382486, …}
+plugin:tldraw:138864 [handwriting] recognition run complete {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', queuedCandidates: 7, recognizedCandidates: 1, totalStoredResults: 7, latencyMs: 8, …}
+plugin:tldraw:137841 [handwriting-probe] extraction success {shapeId: 'shape:Wo5OdWuDPE3JcVF_up-zU', segments: 1, totalPoints: 73}
+plugin:tldraw:137846 [handwriting-probe] final stroke vector {shapeId: 'shape:Wo5OdWuDPE3JcVF_up-zU', strokes: Array(1)}
+plugin:tldraw:137810 [handwriting] extracted stroke geometry {shapeId: 'shape:Wo5OdWuDPE3JcVF_up-zU', segments: 1, totalPoints: 73}
+plugin:tldraw:138892 [handwriting] normalized stroke payload {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', shapeId: 'shape:Wo5OdWuDPE3JcVF_up-zU', segments: 1, totalPoints: 73, storedPayloads: 8, …}
+plugin:tldraw:138910 [handwriting] grouped stroke candidate {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905891637-shape:Ao7m4CiAI1kbH-cvT3F1q', shapeIds: Array(2), boundingBox: {…}, startedAt: 1773905891637, …}
+plugin:tldraw:138817 [handwriting] recognition success {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905891637-shape:Ao7m4CiAI1kbH-cvT3F1q', bestText: 'M', bestConfidence: 0.9802172786690491, candidateCount: 1}
+plugin:tldraw:138825 [handwriting] recognition parity sample {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905891637-shape:Ao7m4CiAI1kbH-cvT3F1q', shapeIds: Array(2), prediction: 'M', confidence: 0.9802172786690491, …}
+plugin:tldraw:138864 [handwriting] recognition run complete {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', queuedCandidates: 7, recognizedCandidates: 1, totalStoredResults: 7, latencyMs: 10, …}
+plugin:tldraw:137841 [handwriting-probe] extraction success {shapeId: 'shape:-tm-ytNKuf1RWLsAxDDCk', segments: 1, totalPoints: 75}
+plugin:tldraw:137846 [handwriting-probe] final stroke vector {shapeId: 'shape:-tm-ytNKuf1RWLsAxDDCk', strokes: Array(1)}
+plugin:tldraw:137810 [handwriting] extracted stroke geometry {shapeId: 'shape:-tm-ytNKuf1RWLsAxDDCk', segments: 1, totalPoints: 75}
+plugin:tldraw:138892 [handwriting] normalized stroke payload {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', shapeId: 'shape:-tm-ytNKuf1RWLsAxDDCk', segments: 1, totalPoints: 75, storedPayloads: 9, …}
+plugin:tldraw:138910 [handwriting] grouped stroke candidate {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905891637-shape:Ao7m4CiAI1kbH-cvT3F1q', shapeIds: Array(3), boundingBox: {…}, startedAt: 1773905891637, …}
+plugin:tldraw:138817 [handwriting] recognition success {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905891637-shape:Ao7m4CiAI1kbH-cvT3F1q', bestText: 'T', bestConfidence: 0.9754272863114101, candidateCount: 1}
+plugin:tldraw:138825 [handwriting] recognition parity sample {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', groupId: 'stroke-group-1773905891637-shape:Ao7m4CiAI1kbH-cvT3F1q', shapeIds: Array(3), prediction: 'T', confidence: 0.9754272863114101, …}
+plugin:tldraw:138864 [handwriting] recognition run complete {documentId: '46ce6dc4-e1d5-474d-8408-fa228f1b0e1e', queuedCandidates: 7, recognizedCandidates: 1, totalStoredResults: 7, latencyMs: 14, …}

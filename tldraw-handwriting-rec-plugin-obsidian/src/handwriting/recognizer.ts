@@ -10,6 +10,9 @@ import {
 
 type OnnxRuntimeWebModule = typeof import('onnxruntime-web')
 
+const ORT_DIST_VERSION = '1.24.3'
+const ORT_WASM_DIST_BASE = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_DIST_VERSION}/dist/`
+
 class StubRecognizer implements HandwritingRecognizer {
 	isReady() {
 		return true
@@ -34,10 +37,36 @@ class OnnxWebRecognizer implements HandwritingRecognizer {
 	private session?: import('onnxruntime-web').InferenceSession
 	private ort?: OnnxRuntimeWebModule
 
-	constructor(private readonly config: OnlineHtrModelConfig) {}
+	constructor(
+		private readonly config: OnlineHtrModelConfig,
+		private readonly loadModelBytes?: (modelUrl: string) => Promise<Uint8Array | undefined>
+	) {}
 
 	isReady() {
 		return !!this.session
+	}
+
+	private configureRuntimeEnvironment(ort: OnnxRuntimeWebModule) {
+		// In Obsidian's bundled plugin runtime, ORT cannot always infer the script URL.
+		// Provide an explicit dist base so WASM binaries can be resolved reliably.
+		ort.env.wasm.wasmPaths = ORT_WASM_DIST_BASE
+		ort.env.wasm.proxy = false
+	}
+
+	private resolveModelUrl(modelUrl: string) {
+		const trimmed = modelUrl.trim()
+		if (trimmed.length === 0) return trimmed
+
+		if (/^[a-zA-Z][a-zA-Z\d+.-]*:\/\//.test(trimmed)) {
+			return trimmed
+		}
+
+		// Interpret POSIX absolute paths as local file URLs in Electron/Obsidian runtime.
+		if (trimmed.startsWith('/')) {
+			return `file://${encodeURI(trimmed)}`
+		}
+
+		return trimmed
 	}
 
 	private async ensureSession() {
@@ -51,7 +80,32 @@ class OnnxWebRecognizer implements HandwritingRecognizer {
 		}
 
 		this.ort = await import('onnxruntime-web')
-		this.session = await this.ort.InferenceSession.create(this.config.modelUrl)
+		this.configureRuntimeEnvironment(this.ort)
+		const resolvedModelUrl = this.resolveModelUrl(this.config.modelUrl)
+
+		let modelSource: string | Uint8Array = resolvedModelUrl
+		if (this.loadModelBytes) {
+			try {
+				const loadedBytes = await this.loadModelBytes(resolvedModelUrl)
+				if (loadedBytes && loadedBytes.length > 0) {
+					modelSource = loadedBytes
+				}
+			} catch (error) {
+				throw new Error(
+					`Failed to read ONNX model bytes for ${resolvedModelUrl}. Root error: ${error instanceof Error ? error.message : String(error)}`
+				)
+			}
+		}
+
+		try {
+			this.session = await this.ort.InferenceSession.create(modelSource, {
+				executionProviders: ['wasm'],
+			})
+		} catch (error) {
+			throw new Error(
+				`Failed to initialize ONNX session (wasm backend). Ensure model source is reachable (${resolvedModelUrl}) and WASM assets are reachable from ${ORT_WASM_DIST_BASE}. Root error: ${error instanceof Error ? error.message : String(error)}`
+			)
+		}
 		return this.session
 	}
 
@@ -105,6 +159,8 @@ class OnnxWebRecognizer implements HandwritingRecognizer {
 
 		return decodeGreedyCtc(perBatch, timeSteps, classes, this.config.alphabet, {
 			blankIndex: this.config.blankIndex ?? 0,
+			allowedCharacters: this.config.allowedCharacters,
+			maxOutputChars: this.config.maxOutputChars,
 		})
 	}
 
@@ -116,11 +172,11 @@ class OnnxWebRecognizer implements HandwritingRecognizer {
 }
 
 export function createHandwritingRecognizer(
-	{ engine = 'stub', onnxModelConfig }: RecognizerFactoryOptions = {}
+	{ engine = 'stub', onnxModelConfig, loadModelBytes }: RecognizerFactoryOptions = {}
 ): HandwritingRecognizer {
 	switch (engine) {
 		case 'onnx-web':
-			return new OnnxWebRecognizer(onnxModelConfig ?? DEFAULT_ONLINE_HTR_MODEL_CONFIG)
+			return new OnnxWebRecognizer(onnxModelConfig ?? DEFAULT_ONLINE_HTR_MODEL_CONFIG, loadModelBytes)
 		case 'stub':
 		default:
 			return new StubRecognizer()

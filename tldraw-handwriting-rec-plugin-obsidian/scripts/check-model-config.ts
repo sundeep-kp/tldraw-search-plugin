@@ -35,10 +35,29 @@ function run() {
 	assert(fromChars.outputName === 'logits', 'Expected outputName to be trimmed.')
 	assert(fromChars.blankIndex === 0, 'Expected invalid blankIndex to fall back to default.')
 
+	const fromJsonArray = resolveOnlineHtrModelConfig({
+		modelUrl: '/vault/model.onnx',
+		alphabet: '[" ",",","a"]',
+		allowedCharacters: 'a,a,b',
+		maxOutputChars: 1.9,
+	})
+	assert(fromJsonArray.alphabet.length === 3, 'Expected JSON-array alphabet length to be preserved.')
+	assert(fromJsonArray.alphabet[0] === ' ', 'Expected JSON-array to preserve space token.')
+	assert(fromJsonArray.alphabet[1] === ',', 'Expected JSON-array to preserve comma token.')
+	assert(fromJsonArray.alphabet[2] === 'a', 'Expected JSON-array to preserve literal token order.')
+	assert(
+		fromJsonArray.allowedCharacters?.join(',') === 'a,b',
+		'Expected allowedCharacters to be deduplicated and normalized.'
+	)
+	assert(fromJsonArray.maxOutputChars === 1, 'Expected maxOutputChars to be normalized with floor().')
+
 	console.log('[check-model-config] PASS', {
 		defaultReady: isOnlineHtrModelConfigReady(empty),
 		csvReady: isOnlineHtrModelConfigReady(fromCsv),
 		charsAlphabetLength: fromChars.alphabet.length,
+		jsonArrayAlphabetLength: fromJsonArray.alphabet.length,
+		allowedCharactersLength: fromJsonArray.allowedCharacters?.length,
+		maxOutputChars: fromJsonArray.maxOutputChars,
 	})
 }
 

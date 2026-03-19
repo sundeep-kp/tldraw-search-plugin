@@ -40,48 +40,29 @@ function cumulativeDistances(points: Point2D[]): number[] {
 	return result
 }
 
-function interpolateByDistance(points: Point2D[], targetCount: number): Point2D[] {
-	if (points.length <= 1 || targetCount <= 1) return [...points]
+/**
+ * Linear interpolation helper function.
+ * Given arrays of x-values (xp) and y-values (fp), interpolate at point x.
+ */
+function linearInterpolate(xp: number[], fp: number[], x: number): number {
+	if (xp.length === 0) return 0
+	if (xp.length === 1) return fp[0]
+	if (x <= xp[0]) return fp[0]
+	if (x >= xp[xp.length - 1]) return fp[fp.length - 1]
 
-	const cumDist = cumulativeDistances(points)
-	const totalDistance = cumDist[cumDist.length - 1]
-	if (totalDistance <= 0) {
-		return [points[0], ...new Array(Math.max(0, targetCount - 1)).fill(points[0])]
+	let i = 0
+	while (i < xp.length - 1 && xp[i + 1] < x) {
+		i++
 	}
 
-	const result: Point2D[] = []
-	for (let i = 0; i < targetCount; i++) {
-		const targetDistance = (i / (targetCount - 1)) * totalDistance
+	const x0 = xp[i]
+	const x1 = xp[i + 1]
+	const y0 = fp[i]
+	const y1 = fp[i + 1]
 
-		let segmentIndex = 1
-		while (segmentIndex < cumDist.length && cumDist[segmentIndex] < targetDistance) {
-			segmentIndex += 1
-		}
-
-		if (segmentIndex >= cumDist.length) {
-			result.push(points[points.length - 1])
-			continue
-		}
-
-		const leftIndex = Math.max(0, segmentIndex - 1)
-		const rightIndex = segmentIndex
-		const leftDistance = cumDist[leftIndex]
-		const rightDistance = cumDist[rightIndex]
-		const span = rightDistance - leftDistance
-
-		if (span <= 0) {
-			result.push(points[rightIndex])
-			continue
-		}
-
-		const alpha = (targetDistance - leftDistance) / span
-		result.push({
-			x: points[leftIndex].x + alpha * (points[rightIndex].x - points[leftIndex].x),
-			y: points[leftIndex].y + alpha * (points[rightIndex].y - points[leftIndex].y),
-		})
-	}
-
-	return result
+	if (x1 === x0) return y0
+	const alpha = (x - x0) / (x1 - x0)
+	return y0 + alpha * (y1 - y0)
 }
 
 function flattenGroupStrokes(group: StrokeGroupCandidate): Point2D[][] {
@@ -138,6 +119,18 @@ function shiftAndScale(strokes: Point2D[][]): Point2D[][] | null {
 	)
 }
 
+/**
+ * Implements Carbune2020 resampling: time-normalized linear interpolation.
+ * 
+ * Algorithm:
+ * 1. Compute cumulative distances along the stroke
+ * 2. Calculate stroke length and target point count
+ * 3. Allocate synthetic time proportional to cumulative distance
+ * 4. Normalize time to [0, 1] per stroke
+ * 5. Interpolate X, Y, and time in normalized time space
+ * 
+ * This matches the OnlineHTR training preprocessing exactly.
+ */
 function resampleStrokes(
 	strokes: Point2D[][],
 	pointsPerUnitLength: number
@@ -149,6 +142,7 @@ function resampleStrokes(
 		const stroke = strokes[strokeNr]
 		if (stroke.length === 0) continue
 
+		// Handle single-point strokes
 		if (stroke.length === 1) {
 			points.push({
 				x: stroke[0].x,
@@ -160,22 +154,68 @@ function resampleStrokes(
 			continue
 		}
 
-		const strokeLength = cumulativeDistances(stroke).at(-1) ?? 0
-		let targetCount = Math.ceil(strokeLength * pointsPerUnitLength)
+		// Calculate stroke length and target point count
+		const cumDist = cumulativeDistances(stroke)
+		const totalDistance = cumDist[cumDist.length - 1]
+
+		if (totalDistance <= 0) {
+			// Degenerate stroke: all points at same location
+			points.push({
+				x: stroke[0].x,
+				y: stroke[0].y,
+				t: currentTimeBase,
+				strokeNr,
+			})
+			currentTimeBase += 2
+			continue
+		}
+
+		let targetCount = Math.ceil(totalDistance * pointsPerUnitLength)
 		if (targetCount <= 1) targetCount = 2
 
-		const resampled = interpolateByDistance(stroke, targetCount)
-		if (resampled.length === 0) continue
+		// Step 1: Create synthetic time proportional to cumulative distance
+		const syntheticTime = cumDist.map((d) => (d / totalDistance) * 1.0) // Allocate [0, 1]
 
+		// Step 2: Normalize time to [0, 1] per stroke
+		const timeMin = syntheticTime[0]
+		const timeMax = syntheticTime[syntheticTime.length - 1]
+		const timeSpan = timeMax - timeMin
+		const normalizedTime = syntheticTime.map((t) =>
+			timeSpan > 0 ? (t - timeMin) / timeSpan : 0
+		)
+
+		// Step 3: Create target normalized time points (uniformly spaced in time space)
+		const targetNormalizedTime: number[] = []
+		for (let i = 0; i < targetCount; i++) {
+			targetNormalizedTime.push(
+				targetCount === 1 ? 0.5 : i / (targetCount - 1)
+			)
+		}
+
+		// Step 4: Extract x, y coordinates
+		const xs = stroke.map((p) => p.x)
+		const ys = stroke.map((p) => p.y)
+
+		// Step 5: Interpolate X, Y in normalized time space
+		const resampledX: number[] = []
+		const resampledY: number[] = []
+		const resampledT: number[] = []
+
+		for (const targetTime of targetNormalizedTime) {
+			resampledX.push(linearInterpolate(normalizedTime, xs, targetTime))
+			resampledY.push(linearInterpolate(normalizedTime, ys, targetTime))
+			// Recover original time value via interpolation
+			resampledT.push(linearInterpolate(normalizedTime, syntheticTime, targetTime))
+		}
+
+		// Step 6: Convert to absolute time and add to output
 		const startTime = currentTimeBase
 		const endTime = currentTimeBase + 1
-		const step = resampled.length <= 1 ? 0 : (endTime - startTime) / (resampled.length - 1)
-
-		for (let i = 0; i < resampled.length; i++) {
+		for (let i = 0; i < resampledX.length; i++) {
 			points.push({
-				x: resampled[i].x,
-				y: resampled[i].y,
-				t: startTime + step * i,
+				x: resampledX[i],
+				y: resampledY[i],
+				t: startTime + (endTime - startTime) * (resampledT[i] - timeMin) / (timeMax - timeMin),
 				strokeNr,
 			})
 		}

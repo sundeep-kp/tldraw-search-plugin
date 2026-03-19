@@ -4,6 +4,8 @@ export type OnlineHtrModelConfig = {
 	inputName?: string
 	outputName?: string
 	blankIndex?: number
+	allowedCharacters?: string[]
+	maxOutputChars?: number
 }
 
 export type OnlineHtrModelConfigInput = {
@@ -12,6 +14,8 @@ export type OnlineHtrModelConfigInput = {
 	inputName?: string
 	outputName?: string
 	blankIndex?: number
+	allowedCharacters?: string[] | string
+	maxOutputChars?: number
 }
 
 // Placeholder config for local development. Replace with real model artifact and alphabet.
@@ -21,16 +25,30 @@ export const DEFAULT_ONLINE_HTR_MODEL_CONFIG: OnlineHtrModelConfig = {
 	inputName: 'input',
 	outputName: 'output',
 	blankIndex: 0,
+	allowedCharacters: [],
+	maxOutputChars: 0,
 }
 
 function normalizeAlphabet(input: OnlineHtrModelConfigInput['alphabet']): string[] {
 	if (Array.isArray(input)) {
-		return input.map((entry) => entry.trim()).filter((entry) => entry.length > 0)
+		return input.filter((entry): entry is string => typeof entry === 'string')
 	}
 
 	if (typeof input === 'string') {
 		const text = input.trim()
 		if (text.length === 0) return []
+
+		// Support JSON-array input so special tokens (e.g. space or comma) are preserved losslessly.
+		if (text.startsWith('[') && text.endsWith(']')) {
+			try {
+				const parsed = JSON.parse(text)
+				if (Array.isArray(parsed)) {
+					return parsed.filter((entry): entry is string => typeof entry === 'string')
+				}
+			} catch {
+				// Fall back to legacy parsing below.
+			}
+		}
 
 		if (text.includes(',') || text.includes('\n')) {
 			return text
@@ -43,6 +61,11 @@ function normalizeAlphabet(input: OnlineHtrModelConfigInput['alphabet']): string
 	}
 
 	return []
+}
+
+function normalizeAllowedCharacters(input: OnlineHtrModelConfigInput['allowedCharacters']): string[] {
+	const parsed = normalizeAlphabet(input)
+	return parsed.filter((char, index) => char.length > 0 && parsed.indexOf(char) === index)
 }
 
 export function resolveOnlineHtrModelConfig(
@@ -67,6 +90,11 @@ export function resolveOnlineHtrModelConfig(
 			typeof input.blankIndex === 'number' && Number.isFinite(input.blankIndex) && input.blankIndex >= 0
 				? Math.floor(input.blankIndex)
 				: DEFAULT_ONLINE_HTR_MODEL_CONFIG.blankIndex,
+		allowedCharacters: normalizeAllowedCharacters(input.allowedCharacters),
+		maxOutputChars:
+			typeof input.maxOutputChars === 'number' && Number.isFinite(input.maxOutputChars) && input.maxOutputChars >= 0
+				? Math.floor(input.maxOutputChars)
+				: DEFAULT_ONLINE_HTR_MODEL_CONFIG.maxOutputChars,
 	}
 }
 

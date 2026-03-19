@@ -1,4 +1,4 @@
-import { ExtraButton, Text } from '@obsidian-plugin-toolkit/react/components'
+import { ExtraButton, Text, Toggle } from '@obsidian-plugin-toolkit/react/components'
 import { Group, Setting } from '@obsidian-plugin-toolkit/react/components/setting/group'
 import React, { useCallback, useMemo } from 'react'
 import useSettingsManager from 'src/hooks/useSettingsManager'
@@ -20,8 +20,16 @@ function HandwritingRecognitionSettingsGroup() {
 
 	const updateRecognitionField = useCallback(
 		async (
-			field: 'modelUrl' | 'alphabet' | 'inputName' | 'outputName' | 'blankIndex',
-			value: string | number
+			field:
+				| 'modelUrl'
+				| 'alphabet'
+				| 'inputName'
+				| 'outputName'
+				| 'blankIndex'
+				| 'singleShapeMode'
+				| 'allowedCharacters'
+				| 'maxOutputChars',
+			value: string | number | boolean
 		) => {
 			const current = settingsManager.settings.handwritingRecognition ?? {}
 			settingsManager.settings.handwritingRecognition = {
@@ -34,7 +42,17 @@ function HandwritingRecognitionSettingsGroup() {
 	)
 
 	const resetModelField = useCallback(
-		async (field: 'modelUrl' | 'alphabet' | 'inputName' | 'outputName' | 'blankIndex') => {
+		async (
+			field:
+				| 'modelUrl'
+				| 'alphabet'
+				| 'inputName'
+				| 'outputName'
+				| 'blankIndex'
+				| 'singleShapeMode'
+				| 'allowedCharacters'
+				| 'maxOutputChars'
+		) => {
 			const defaults = DEFAULT_SETTINGS.handwritingRecognition
 			const current = settingsManager.settings.handwritingRecognition ?? {}
 			settingsManager.settings.handwritingRecognition = {
@@ -83,12 +101,42 @@ function HandwritingRecognitionSettingsGroup() {
 		[updateRecognitionField]
 	)
 
+	const onSingleShapeModeChange = useCallback(
+		async (value: boolean) => {
+			await updateRecognitionField('singleShapeMode', value)
+		},
+		[updateRecognitionField]
+	)
+
+	const onAllowedCharactersChange = useCallback(
+		async (value: string) => {
+			await updateRecognitionField('allowedCharacters', value)
+		},
+		[updateRecognitionField]
+	)
+
+	const onMaxOutputCharsChange = useCallback(
+		async (value: string) => {
+			const parsed = Number.parseInt(value, 10)
+			if (Number.isNaN(parsed)) return
+			await updateRecognitionField('maxOutputChars', parsed)
+		},
+		[updateRecognitionField]
+	)
+
 	const alphabetText = useMemo(() => {
 		const configured = settings.handwritingRecognition?.alphabet
 		if (Array.isArray(configured)) return configured.join(',')
 		if (typeof configured === 'string') return configured
 		return ''
 	}, [settings.handwritingRecognition?.alphabet])
+
+	const allowedCharactersText = useMemo(() => {
+		const configured = settings.handwritingRecognition?.allowedCharacters
+		if (Array.isArray(configured)) return configured.join(',')
+		if (typeof configured === 'string') return configured
+		return ''
+	}, [settings.handwritingRecognition?.allowedCharacters])
 
 	return (
 		<>
@@ -111,12 +159,12 @@ function HandwritingRecognitionSettingsGroup() {
 			<Setting
 				slots={{
 					name: 'Alphabet',
-					desc: 'Comma-separated labels (e.g. a,b,c) or plain character sequence (e.g. abc).',
+					desc: 'Comma-separated labels (e.g. a,b,c), plain character sequence (e.g. abc), or JSON array for special tokens (e.g. [" ",",","a"]).',
 					control: (
 						<>
 							<Text
 								value={alphabetText}
-								placeholder="a,b,c"
+								placeholder='[" ",",","a","b"]'
 								onChange={onAlphabetChange}
 							/>
 							<ExtraButton icon="reset" tooltip="reset" onClick={() => resetModelField('alphabet')} />
@@ -168,6 +216,53 @@ function HandwritingRecognitionSettingsGroup() {
 								onChange={onBlankIndexChange}
 							/>
 							<ExtraButton icon="reset" tooltip="reset" onClick={() => resetModelField('blankIndex')} />
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Single shape recognition mode',
+					desc: 'Treat each newly drawn shape as a standalone recognition candidate (disables multi-shape grouping). Useful for per-character benchmarking.',
+					control: (
+						<>
+							<Toggle
+								value={!!settings.handwritingRecognition?.singleShapeMode}
+								onChange={onSingleShapeModeChange}
+							/>
+							<ExtraButton
+								icon="reset"
+								tooltip="reset"
+								onClick={() => resetModelField('singleShapeMode')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Allowed characters',
+					desc: 'Optional decode constraint. Use comma-separated labels, plain sequence, or JSON array (e.g. a,b,c or abc or ["a","b","c"]). Empty disables filtering.',
+					control: (
+						<>
+							<Text value={allowedCharactersText} placeholder='a,b,c,1,2,3' onChange={onAllowedCharactersChange} />
+							<ExtraButton icon="reset" tooltip="reset" onClick={() => resetModelField('allowedCharacters')} />
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Max output chars',
+					desc: 'Limit decoded output length. Set 1 for single-character recognition. Set 0 for no cap.',
+					control: (
+						<>
+							<Text
+								value={`${settings.handwritingRecognition?.maxOutputChars ?? ''}`}
+								placeholder={`${DEFAULT_SETTINGS.handwritingRecognition.maxOutputChars}`}
+								onChange={onMaxOutputCharsChange}
+							/>
+							<ExtraButton icon="reset" tooltip="reset" onClick={() => resetModelField('maxOutputChars')} />
 						</>
 					),
 				}}

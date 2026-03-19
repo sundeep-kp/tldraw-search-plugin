@@ -63,6 +63,7 @@ Last updated: 2026-03-17
 - [x] Added `scripts/check-recognition-lifecycle.ts` smoke script for debounce and stale-run behavior
 - [x] Verified recognition store cleanup on scope release in `scripts/check-recognition-lifecycle.ts`
 - [x] Added `scripts/check-model-config.ts` for model config normalization/readiness checks
+- [x] Added JSON-array alphabet edge-case coverage in `scripts/check-model-config.ts`
 - [x] Repeated `npm run build` checks succeeded after each implementation unit
 
 ## Pending Next Steps
@@ -119,6 +120,9 @@ Decision: use `PellelNitram/OnlineHTR` as the model source and integrate via pur
 - [x] Add `src/handwriting/ctcDecoder.ts` for greedy CTC decoding.
 - [x] Add `src/handwriting/modelConfig.ts` for model URL/alphabet/runtime configuration.
 - [x] Add model config normalization/readiness helpers in `src/handwriting/modelConfig.ts`.
+- [x] Support lossless JSON-array alphabet parsing (space/comma token safe) in `src/handwriting/modelConfig.ts`.
+- [x] Configure explicit ORT WASM dist path and force `wasm` execution provider in `src/handwriting/recognizer.ts`.
+- [x] Load local absolute/file URLs via Node `fs` bytes in `src/handwriting/recognizer.ts` to bypass renderer local-resource restrictions.
 
 ### Phase 5 - App Integration (In-Memory Results Only)
 
@@ -134,6 +138,14 @@ Decision: use `PellelNitram/OnlineHTR` as the model source and integrate via pur
 - [x] Extend `TldrawPluginSettings` with optional `handwritingRecognition` model fields.
 - [x] Merge nested `handwritingRecognition` defaults in `UserSettingsManager.loadSettings()`.
 - [x] Add `src/components/settings/HandwritingRecognitionSettings.tsx` and register `Handwriting` tab in settings UI.
+- [x] Document JSON-array alphabet input format for special tokens in `HandwritingRecognitionSettings` UI.
+- [x] Add `handwritingRecognition.singleShapeMode` toggle for per-shape benchmark runs.
+
+### Runtime Diagnostics
+
+- [x] Add debug console error logging for failed recognition runs in `src/components/TldrawApp.tsx`.
+- [x] Add per-run recognition preview logs and per-shape mode grouping override in `src/components/TldrawApp.tsx`.
+- [x] Add debug parity payload logging (`timeSteps`, `channels`, full `ink`) per recognized candidate in `src/components/TldrawApp.tsx`.
 
 ### Phase 6 - Verification and Hardening
 

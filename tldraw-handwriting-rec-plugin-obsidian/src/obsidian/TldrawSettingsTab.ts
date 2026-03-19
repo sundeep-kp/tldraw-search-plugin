@@ -162,6 +162,9 @@ export interface TldrawPluginSettings extends DeprecatedFileDestinationSettings 
 		inputName?: string
 		outputName?: string
 		blankIndex?: number
+		singleShapeMode?: boolean
+		allowedCharacters?: string[] | string
+		maxOutputChars?: number
 	}
 }
 
@@ -200,6 +203,9 @@ export const DEFAULT_SETTINGS = {
 		inputName: 'input',
 		outputName: 'output',
 		blankIndex: 0,
+		singleShapeMode: false,
+		allowedCharacters: [],
+		maxOutputChars: 0,
 	},
 } as const satisfies Partial<TldrawPluginSettings>
 

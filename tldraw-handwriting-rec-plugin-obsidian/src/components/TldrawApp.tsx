@@ -7,6 +7,7 @@ import { useClickAwayListener } from 'src/hooks/useClickAwayListener'
 import useUserPluginSettings from 'src/hooks/useUserPluginSettings'
 import { isOnlineHtrModelConfigReady, resolveOnlineHtrModelConfig } from 'src/handwriting/modelConfig'
 import { processExtractedStroke } from 'src/handwriting/pipeline'
+import { preprocessGroupForOnlineHtr } from 'src/handwriting/preprocessors/onlineHtrCarbune2020'
 import { createHandwritingRecognizer } from 'src/handwriting/recognizer'
 import {
 	acquireDocumentRecognitionScope,
@@ -266,11 +267,60 @@ const TldrawApp = ({
 		return isOnlineHtrModelConfigReady(onnxModelConfig) ? 'onnx-web' : 'stub'
 	}, [onnxModelConfig])
 
+	const loadModelBytes = React.useCallback(
+		async (modelUrl: string) => {
+			const adapter = plugin.app.vault.adapter as {
+				readBinary?: (path: string) => Promise<ArrayBuffer>
+				getBasePath?: () => string
+			}
+
+			if (!adapter.readBinary) return undefined
+
+			const normalized = modelUrl.replace(/^file:\/\//, '')
+			if (/^https?:\/\//.test(normalized)) return undefined
+
+			const decodedPath = decodeURI(normalized)
+			const basePath = adapter.getBasePath?.()
+			if (basePath && decodedPath.startsWith('/') && !decodedPath.startsWith(basePath)) {
+				throw new Error(
+					`Model path is outside the active vault. Move the ONNX model under the vault root (${basePath}) and configure modelUrl as a vault-relative path, or use an https URL.`
+				)
+			}
+			const candidatePaths = new Set<string>()
+
+			candidatePaths.add(decodedPath)
+			candidatePaths.add(decodedPath.replace(/^\//, ''))
+
+			if (basePath && decodedPath.startsWith(basePath)) {
+				candidatePaths.add(decodedPath.slice(basePath.length).replace(/^\//, ''))
+			}
+
+			const failures: string[] = []
+			for (const candidatePath of candidatePaths) {
+				if (!candidatePath) continue
+				try {
+					const bytes = await adapter.readBinary(candidatePath)
+					return new Uint8Array(bytes)
+				} catch (error) {
+					failures.push(
+						`${candidatePath} -> ${error instanceof Error ? error.message : String(error)}`
+					)
+				}
+			}
+
+			throw new Error(
+				`Unable to load model via Obsidian adapter. Tried: ${failures.join(' | ')}`
+			)
+		},
+		[plugin.app.vault.adapter]
+	)
+
 	React.useEffect(() => {
 		const previousRecognizer = recognizerRef.current
 		recognizerRef.current = createHandwritingRecognizer({
 			engine: recognizerEngine,
 			onnxModelConfig,
+			loadModelBytes,
 		})
 		recognitionRunVersionRef.current += 1
 
@@ -284,7 +334,7 @@ const TldrawApp = ({
 		}
 
 		void previousRecognizer.dispose()
-	}, [handwritingDocumentId, onnxModelConfig, recognizerEngine, userSettings.debugMode])
+	}, [handwritingDocumentId, loadModelBytes, onnxModelConfig, recognizerEngine, userSettings.debugMode])
 
 	const buildGroupFingerprint = React.useCallback((group: StrokeGroupCandidate) => {
 		return `${group.id}:${group.endedAt}:${group.shapeIds.join(',')}`
@@ -304,6 +354,10 @@ const TldrawApp = ({
 					let recognizedCount = 0
 
 					for (const candidate of candidates) {
+						const debugPreparedSample = userSettings.debugMode
+							? preprocessGroupForOnlineHtr(candidate)
+							: null
+
 						const fingerprint = buildGroupFingerprint(candidate)
 						const existing = getRecognitionResult(handwritingDocumentId, candidate.id)
 						if (existing?.fingerprint === fingerprint && existing.status === 'success') {
@@ -341,8 +395,39 @@ const TldrawApp = ({
 								updatedAt: Date.now(),
 								candidates: recognitionCandidates,
 							})
+
+							if (userSettings.debugMode) {
+								console.log('[handwriting] recognition success', {
+									documentId: handwritingDocumentId,
+									groupId: candidate.id,
+									bestText: recognitionCandidates[0]?.text ?? '',
+									bestConfidence: recognitionCandidates[0]?.confidence ?? 0,
+									candidateCount: recognitionCandidates.length,
+								})
+
+								if (debugPreparedSample) {
+									console.log('[handwriting] recognition parity sample', {
+										documentId: handwritingDocumentId,
+										groupId: candidate.id,
+										shapeIds: candidate.shapeIds,
+										prediction: recognitionCandidates[0]?.text ?? '',
+										confidence: recognitionCandidates[0]?.confidence ?? 0,
+										timeSteps: debugPreparedSample.timeSteps,
+										channels: debugPreparedSample.channels,
+										ink: Array.from(debugPreparedSample.ink),
+									})
+								}
+							}
 							recognizedCount += 1
 						} catch (error) {
+							if (userSettings.debugMode) {
+								console.error('[handwriting] recognition failed', {
+									documentId: handwritingDocumentId,
+									groupId: candidate.id,
+									error: error instanceof Error ? error.message : String(error),
+								})
+							}
+
 							upsertRecognitionResult(handwritingDocumentId, {
 								groupId: candidate.id,
 								shapeIds: candidate.shapeIds,
@@ -357,12 +442,21 @@ const TldrawApp = ({
 					}
 
 					if (userSettings.debugMode) {
+						const recognizedPreview = getDocumentRecognitionResults(handwritingDocumentId)
+							.filter((result) => result.status === 'success')
+							.map((result) => ({
+								groupId: result.groupId,
+								text: result.candidates[0]?.text ?? '',
+								confidence: result.candidates[0]?.confidence ?? 0,
+							}))
+
 						console.log('[handwriting] recognition run complete', {
 							documentId: handwritingDocumentId,
 							queuedCandidates: candidates.length,
 							recognizedCandidates: recognizedCount,
 							totalStoredResults: getDocumentRecognitionResults(handwritingDocumentId).length,
 							latencyMs: Date.now() - runStartedAt,
+							recognizedPreview,
 						})
 					}
 				})()
@@ -378,7 +472,13 @@ const TldrawApp = ({
 
 			upsertNormalizedStrokePayload(handwritingDocumentId, payload)
 			const payloads = getAllNormalizedStrokePayloads(handwritingDocumentId)
-			const groupedCandidates = groupNormalizedStrokePayloads(payloads)
+			const groupedCandidates = userSettings.handwritingRecognition?.singleShapeMode
+				? groupNormalizedStrokePayloads(payloads, {
+						maxTimeDeltaMs: 0,
+						maxHorizontalGapPx: 0,
+						maxVerticalCenterDistancePx: 0,
+				  })
+				: groupNormalizedStrokePayloads(payloads)
 			setDocumentWordCandidates(handwritingDocumentId, groupedCandidates)
 			scheduleRecognition(groupedCandidates)
 
@@ -413,7 +513,12 @@ const TldrawApp = ({
 				}
 			}
 		},
-		[handwritingDocumentId, scheduleRecognition, userSettings.debugMode]
+		[
+			handwritingDocumentId,
+			scheduleRecognition,
+			userSettings.debugMode,
+			userSettings.handwritingRecognition?.singleShapeMode,
+		]
 	)
 
 	React.useEffect(() => {

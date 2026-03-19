@@ -38,7 +38,46 @@ test-full: ## Run all tests
 train: ## Train the model
 	python src/train.py
 
+analyze-plugin-log: ## Analyze plugin benchmark logs (set LOG_FILE and EXPECTED)
+	@if [ -z "$(LOG_FILE)" ]; then \
+		echo "Usage: make analyze-plugin-log LOG_FILE=../.github/test1 EXPECTED=a,a,a,b,b,b,c,c,c"; \
+		exit 2; \
+	fi
+	python scripts/analyze_plugin_console_log.py --log-file "$(LOG_FILE)" --expected "$(EXPECTED)"
+
+profile-iamondb: ## Profile IAM-OnDB data distribution (set DATASET_ROOT)
+	@if [ -z "$(DATASET_ROOT)" ]; then \
+		echo "Usage: make profile-iamondb DATASET_ROOT=data/datasets/IAM-OnDB LIMIT=500"; \
+		exit 2; \
+	fi
+	python scripts/profile_iamondb_dataset.py --dataset-root "$(DATASET_ROOT)" --limit "$(LIMIT)"
+
+eval-restricted: ## Evaluate checkpoint on Own_Dataset with optional restricted decode
+	@if [ -z "$(SAMPLES_DIR)" ]; then \
+		echo "Usage: make eval-restricted SAMPLES_DIR=data/own_samples ALLOWED=a,b,c MAX_OUTPUT=1"; \
+		exit 2; \
+	fi
+	python scripts/eval_restricted_decode.py --samples-dir "$(SAMPLES_DIR)" --allowed-characters "$(ALLOWED)" --max-output-chars "$(MAX_OUTPUT)"
+
+logits-diagnostics: ## Analyze model logits for blank dominance, class collapse (set CHECKPOINT and SAMPLES_DIR)
+	@if [ -z "$(CHECKPOINT)" ]; then \
+		echo "Usage: make logits-diagnostics CHECKPOINT=models/.../best.ckpt SAMPLES_DIR=data/samples RESTRICTED=a,b,c"; \
+		exit 2; \
+	fi
+	@if [ -z "$(SAMPLES_DIR)" ]; then \
+		echo "Usage: make logits-diagnostics CHECKPOINT=models/.../best.ckpt SAMPLES_DIR=data/samples RESTRICTED=a,b,c"; \
+		exit 2; \
+	fi
+	python scripts/logits_diagnostics.py --checkpoint "$(CHECKPOINT)" --samples-dir "$(SAMPLES_DIR)" --restricted-alphabet "$(RESTRICTED)" --json-output logits_report.json
+
+preprocess-validation: ## Validate preprocessing contract (compare plugin vs Carbune2020 on samples)
+	@if [ -z "$(DATASET_ROOT)" ]; then \
+		echo "Usage: make preprocess-validation DATASET_ROOT=data/datasets/IAM-OnDB LIMIT=100"; \
+		exit 2; \
+	fi
+	python scripts/preprocess_validation.py --dataset-root "$(DATASET_ROOT)" --limit "$(LIMIT)" --validate-contract
+
 docs: ## Render docs w/ MMkDocs similar to https://docs.kidger.site/diffrax/
 	@echo "NOT YET IMPLEMENTED!"
 
-.PHONY: docs
+.PHONY: docs analyze-plugin-log profile-iamondb eval-restricted logits-diagnostics preprocess-validation

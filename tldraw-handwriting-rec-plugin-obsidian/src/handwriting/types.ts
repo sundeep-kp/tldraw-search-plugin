@@ -77,4 +77,5 @@ export type RecognizerEngine = 'stub' | 'onnx-web'
 export type RecognizerFactoryOptions = {
 	engine?: RecognizerEngine
 	onnxModelConfig?: OnlineHtrModelConfig
+	loadModelBytes?: (modelUrl: string) => Promise<Uint8Array | undefined>
 }
