@@ -23,6 +23,14 @@ function HandwritingRecognitionSettingsGroup() {
 			field:
 				| 'backend'
 				| 'manualPredictButton'
+				| 'searchZoomMinSizePx'
+				| 'pressureSensitivity'
+				| 'pencilTextureIntensity'
+				| 'pencilTextureEnabled'
+				| 'showRecognizedBatchTextOverlay'
+				| 'recognitionDebounceMs'
+				| 'strokeGroupingMaxTimeDeltaMs'
+				| 'strokeGroupingAdaptiveGapMultiplier'
 				| 'modelUrl'
 				| 'alphabet'
 				| 'inputName'
@@ -33,7 +41,15 @@ function HandwritingRecognitionSettingsGroup() {
 				| 'maxOutputChars'
 				| 'googleImeLanguage'
 				| 'googleImeNumOfWords'
-				| 'googleImeNumOfReturn',
+				| 'googleImeNumOfReturn'
+				| 'googleImeBatchMaxWidthPx'
+				| 'googleImeBatchMaxHeightPx'
+				| 'googleImeBatchMaxGroups'
+				| 'googleImeBatchMaxStrokes'
+				| 'googleImeBatchMaxPoints'
+				| 'googleImeBatchBoundaryTimeGapMs'
+				| 'googleImeBatchIdleFlushMs'
+				| 'googleImeBatchHardMaxAgeMs',
 			value: string | number | boolean
 		) => {
 			const current = settingsManager.settings.handwritingRecognition ?? {}
@@ -51,6 +67,14 @@ function HandwritingRecognitionSettingsGroup() {
 			field:
 				| 'backend'
 				| 'manualPredictButton'
+				| 'searchZoomMinSizePx'
+				| 'pressureSensitivity'
+				| 'pencilTextureIntensity'
+				| 'pencilTextureEnabled'
+				| 'showRecognizedBatchTextOverlay'
+				| 'recognitionDebounceMs'
+				| 'strokeGroupingMaxTimeDeltaMs'
+				| 'strokeGroupingAdaptiveGapMultiplier'
 				| 'modelUrl'
 				| 'alphabet'
 				| 'inputName'
@@ -62,6 +86,14 @@ function HandwritingRecognitionSettingsGroup() {
 				| 'googleImeLanguage'
 				| 'googleImeNumOfWords'
 				| 'googleImeNumOfReturn'
+				| 'googleImeBatchMaxWidthPx'
+				| 'googleImeBatchMaxHeightPx'
+				| 'googleImeBatchMaxGroups'
+				| 'googleImeBatchMaxStrokes'
+				| 'googleImeBatchMaxPoints'
+				| 'googleImeBatchBoundaryTimeGapMs'
+				| 'googleImeBatchIdleFlushMs'
+				| 'googleImeBatchHardMaxAgeMs'
 		) => {
 			const defaults = DEFAULT_SETTINGS.handwritingRecognition
 			const current = settingsManager.settings.handwritingRecognition ?? {}
@@ -148,6 +180,50 @@ function HandwritingRecognitionSettingsGroup() {
 		[updateRecognitionField]
 	)
 
+	const onPressureSensitivityChange = useCallback(
+		async (value: string) => {
+			const parsed = Number.parseFloat(value)
+			if (Number.isNaN(parsed)) return
+			const clamped = Math.max(0.5, Math.min(5, parsed))
+			await updateRecognitionField('pressureSensitivity', +clamped.toFixed(2))
+		},
+		[updateRecognitionField]
+	)
+
+	const onSearchZoomMinSizeChange = useCallback(
+		async (value: string) => {
+			const parsed = Number.parseFloat(value)
+			if (Number.isNaN(parsed)) return
+			const clamped = Math.max(32, Math.min(512, parsed))
+			await updateRecognitionField('searchZoomMinSizePx', Math.round(clamped))
+		},
+		[updateRecognitionField]
+	)
+
+	const onPencilTextureIntensityChange = useCallback(
+		async (value: string) => {
+			const parsed = Number.parseFloat(value)
+			if (Number.isNaN(parsed)) return
+			const clamped = Math.max(0, Math.min(1, parsed))
+			await updateRecognitionField('pencilTextureIntensity', +clamped.toFixed(3))
+		},
+		[updateRecognitionField]
+	)
+
+	const onPencilTextureEnabledChange = useCallback(
+		async (value: boolean) => {
+			await updateRecognitionField('pencilTextureEnabled', value)
+		},
+		[updateRecognitionField]
+	)
+
+	const onShowRecognizedBatchTextOverlayChange = useCallback(
+		async (value: boolean) => {
+			await updateRecognitionField('showRecognizedBatchTextOverlay', value)
+		},
+		[updateRecognitionField]
+	)
+
 	const onGoogleImeLanguageChange = useCallback(
 		async (value: string) => {
 			await updateRecognitionField('googleImeLanguage', value)
@@ -173,6 +249,106 @@ function HandwritingRecognitionSettingsGroup() {
 		[updateRecognitionField]
 	)
 
+	const onRecognitionDebounceMsChange = useCallback(
+		async (value: string) => {
+			const parsed = Number.parseInt(value, 10)
+			if (Number.isNaN(parsed)) return
+			await updateRecognitionField('recognitionDebounceMs', parsed)
+		},
+		[updateRecognitionField]
+	)
+
+	const onStrokeGroupingMaxTimeDeltaMsChange = useCallback(
+		async (value: string) => {
+			const parsed = Number.parseInt(value, 10)
+			if (Number.isNaN(parsed)) return
+			await updateRecognitionField('strokeGroupingMaxTimeDeltaMs', parsed)
+		},
+		[updateRecognitionField]
+	)
+
+	const onStrokeGroupingAdaptiveGapMultiplierChange = useCallback(
+		async (value: string) => {
+			const parsed = Number.parseFloat(value)
+			if (Number.isNaN(parsed)) return
+			const clamped = Math.min(2, Math.max(0.5, parsed))
+			await updateRecognitionField('strokeGroupingAdaptiveGapMultiplier', clamped)
+		},
+		[updateRecognitionField]
+	)
+
+	const onGoogleImeBatchMaxWidthPxChange = useCallback(
+		async (value: string) => {
+			const parsed = Number.parseInt(value, 10)
+			if (Number.isNaN(parsed)) return
+			await updateRecognitionField('googleImeBatchMaxWidthPx', parsed)
+		},
+		[updateRecognitionField]
+	)
+
+	const onGoogleImeBatchMaxHeightPxChange = useCallback(
+		async (value: string) => {
+			const parsed = Number.parseInt(value, 10)
+			if (Number.isNaN(parsed)) return
+			await updateRecognitionField('googleImeBatchMaxHeightPx', parsed)
+		},
+		[updateRecognitionField]
+	)
+
+	const onGoogleImeBatchMaxGroupsChange = useCallback(
+		async (value: string) => {
+			const parsed = Number.parseInt(value, 10)
+			if (Number.isNaN(parsed)) return
+			await updateRecognitionField('googleImeBatchMaxGroups', parsed)
+		},
+		[updateRecognitionField]
+	)
+
+	const onGoogleImeBatchMaxStrokesChange = useCallback(
+		async (value: string) => {
+			const parsed = Number.parseInt(value, 10)
+			if (Number.isNaN(parsed)) return
+			await updateRecognitionField('googleImeBatchMaxStrokes', parsed)
+		},
+		[updateRecognitionField]
+	)
+
+	const onGoogleImeBatchMaxPointsChange = useCallback(
+		async (value: string) => {
+			const parsed = Number.parseInt(value, 10)
+			if (Number.isNaN(parsed)) return
+			await updateRecognitionField('googleImeBatchMaxPoints', parsed)
+		},
+		[updateRecognitionField]
+	)
+
+	const onGoogleImeBatchBoundaryTimeGapMsChange = useCallback(
+		async (value: string) => {
+			const parsed = Number.parseInt(value, 10)
+			if (Number.isNaN(parsed)) return
+			await updateRecognitionField('googleImeBatchBoundaryTimeGapMs', parsed)
+		},
+		[updateRecognitionField]
+	)
+
+	const onGoogleImeBatchIdleFlushMsChange = useCallback(
+		async (value: string) => {
+			const parsed = Number.parseInt(value, 10)
+			if (Number.isNaN(parsed)) return
+			await updateRecognitionField('googleImeBatchIdleFlushMs', parsed)
+		},
+		[updateRecognitionField]
+	)
+
+	const onGoogleImeBatchHardMaxAgeMsChange = useCallback(
+		async (value: string) => {
+			const parsed = Number.parseInt(value, 10)
+			if (Number.isNaN(parsed)) return
+			await updateRecognitionField('googleImeBatchHardMaxAgeMs', parsed)
+		},
+		[updateRecognitionField]
+	)
+
 	const alphabetText = useMemo(() => {
 		const configured = settings.handwritingRecognition?.alphabet
 		if (Array.isArray(configured)) return configured.join(',')
@@ -186,6 +362,36 @@ function HandwritingRecognitionSettingsGroup() {
 		if (typeof configured === 'string') return configured
 		return ''
 	}, [settings.handwritingRecognition?.allowedCharacters])
+
+	const pressureSensitivity = useMemo(() => {
+		const configured = settings.handwritingRecognition?.pressureSensitivity
+		if (typeof configured !== 'number' || !Number.isFinite(configured)) {
+			return DEFAULT_SETTINGS.handwritingRecognition.pressureSensitivity
+		}
+		return Math.max(0.5, Math.min(5, configured))
+	}, [settings.handwritingRecognition?.pressureSensitivity])
+
+	const searchZoomMinSize = useMemo(() => {
+		const configured = settings.handwritingRecognition?.searchZoomMinSizePx
+		if (typeof configured !== 'number' || !Number.isFinite(configured)) {
+			return DEFAULT_SETTINGS.handwritingRecognition.searchZoomMinSizePx
+		}
+		return Math.max(32, Math.min(512, configured))
+	}, [settings.handwritingRecognition?.searchZoomMinSizePx])
+
+	const pencilTextureIntensity = useMemo(() => {
+		const configured = settings.handwritingRecognition?.pencilTextureIntensity
+		if (typeof configured !== 'number' || !Number.isFinite(configured)) {
+			return DEFAULT_SETTINGS.handwritingRecognition.pencilTextureIntensity
+		}
+		return Math.max(0, Math.min(1, configured))
+	}, [settings.handwritingRecognition?.pencilTextureIntensity])
+
+	const pencilTextureEnabled = useMemo(() => {
+		const configured = settings.handwritingRecognition?.pencilTextureEnabled
+		if (typeof configured === 'boolean') return configured
+		return DEFAULT_SETTINGS.handwritingRecognition.pencilTextureEnabled
+	}, [settings.handwritingRecognition?.pencilTextureEnabled])
 
 	return (
 		<>
@@ -223,6 +429,192 @@ function HandwritingRecognitionSettingsGroup() {
 								icon="reset"
 								tooltip="reset"
 								onClick={() => resetModelField('manualPredictButton')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Search zoom minimum size',
+					desc: 'Controls how far search focuses on recognized text. Increase this to zoom out more for short words.',
+					control: (
+						<>
+							<div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '240px' }}>
+								<input
+									type='range'
+									min='32'
+									max='512'
+									step='8'
+									value={searchZoomMinSize}
+									onChange={(event) => onSearchZoomMinSizeChange(event.currentTarget.value)}
+									style={{ flex: 1 }}
+								/>
+								<span style={{ width: '56px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+									{Math.round(searchZoomMinSize)}px
+								</span>
+							</div>
+							<ExtraButton
+								icon='reset'
+								tooltip='reset'
+								onClick={() => resetModelField('searchZoomMinSizePx')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Pencil pressure sensitivity',
+					desc: 'Controls how strongly pressure differences affect pencil stroke variation. Increase this if pressure changes are barely visible.',
+					control: (
+						<>
+							<div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '240px' }}>
+								<input
+									type='range'
+									min='0.5'
+									max='5'
+									step='0.1'
+									value={pressureSensitivity}
+									onChange={(event) => onPressureSensitivityChange(event.currentTarget.value)}
+									style={{ flex: 1 }}
+								/>
+								<span style={{ width: '44px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+									{pressureSensitivity.toFixed(1)}x
+								</span>
+							</div>
+							<ExtraButton
+								icon='reset'
+								tooltip='reset'
+								onClick={() => resetModelField('pressureSensitivity')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Pencil grain texture',
+					desc: 'Enable subtle grain texture on pencil strokes for a more realistic, hand-drawn appearance.',
+					control: (
+						<>
+							<Toggle
+								value={pencilTextureEnabled}
+								onChange={onPencilTextureEnabledChange}
+							/>
+							<ExtraButton
+								icon="reset"
+								tooltip="reset"
+								onClick={() => resetModelField('pencilTextureEnabled')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Pencil texture intensity',
+					desc: 'Controls the strength of the grain texture effect. Higher values make the texture more prominent.',
+					control: (
+						<>
+							<div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '240px' }}>
+								<input
+									type='range'
+									min='0'
+									max='1'
+									step='0.01'
+									value={pencilTextureIntensity}
+									onChange={(event) => onPencilTextureIntensityChange(event.currentTarget.value)}
+									style={{ flex: 1 }}
+									disabled={!pencilTextureEnabled}
+								/>
+								<span style={{ width: '44px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+									{(pencilTextureIntensity * 100).toFixed(0)}%
+								</span>
+							</div>
+							<ExtraButton
+								icon='reset'
+								tooltip='reset'
+								onClick={() => resetModelField('pencilTextureIntensity')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Show recognized batch text overlay',
+					desc: 'Display recognized text over each handwriting batch bounding area on the canvas.',
+					control: (
+						<>
+							<Toggle
+								value={!!settings.handwritingRecognition?.showRecognizedBatchTextOverlay}
+								onChange={onShowRecognizedBatchTextOverlayChange}
+							/>
+							<ExtraButton
+								icon="reset"
+								tooltip="reset"
+								onClick={() => resetModelField('showRecognizedBatchTextOverlay')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Recognition debounce (ms)',
+					desc: 'Delay before recognition requests are sent. Higher values reduce API burst risk.',
+					control: (
+						<>
+							<Text
+								value={`${settings.handwritingRecognition?.recognitionDebounceMs ?? ''}`}
+								placeholder={`${DEFAULT_SETTINGS.handwritingRecognition.recognitionDebounceMs}`}
+								onChange={onRecognitionDebounceMsChange}
+							/>
+							<ExtraButton
+								icon="reset"
+								tooltip="reset"
+								onClick={() => resetModelField('recognitionDebounceMs')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Stroke grouping max time delta (ms)',
+					desc: 'Maximum time gap between consecutive strokes to keep them in the same character/word group before Google batching.',
+					control: (
+						<>
+							<Text
+								value={`${settings.handwritingRecognition?.strokeGroupingMaxTimeDeltaMs ?? ''}`}
+								placeholder={`${DEFAULT_SETTINGS.handwritingRecognition.strokeGroupingMaxTimeDeltaMs}`}
+								onChange={onStrokeGroupingMaxTimeDeltaMsChange}
+							/>
+							<ExtraButton
+								icon="reset"
+								tooltip="reset"
+								onClick={() => resetModelField('strokeGroupingMaxTimeDeltaMs')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Adaptive stroke gap multiplier',
+					desc: 'Fine-tune adaptive grouping based on stroke size. Lower values are stricter, higher values are more permissive.',
+					control: (
+						<>
+							<Text
+								value={`${settings.handwritingRecognition?.strokeGroupingAdaptiveGapMultiplier ?? ''}`}
+								placeholder={`${DEFAULT_SETTINGS.handwritingRecognition.strokeGroupingAdaptiveGapMultiplier}`}
+								onChange={onStrokeGroupingAdaptiveGapMultiplierChange}
+							/>
+							<ExtraButton
+								icon="reset"
+								tooltip="reset"
+								onClick={() => resetModelField('strokeGroupingAdaptiveGapMultiplier')}
 							/>
 						</>
 					),
@@ -283,6 +675,166 @@ function HandwritingRecognitionSettingsGroup() {
 								icon="reset"
 								tooltip="reset"
 								onClick={() => resetModelField('googleImeNumOfReturn')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Google IME batch max width (px)',
+					desc: 'Maximum merged batch width for auto Google mode before flushing a new request.',
+					control: (
+						<>
+							<Text
+								value={`${settings.handwritingRecognition?.googleImeBatchMaxWidthPx ?? ''}`}
+								placeholder={`${DEFAULT_SETTINGS.handwritingRecognition.googleImeBatchMaxWidthPx}`}
+								onChange={onGoogleImeBatchMaxWidthPxChange}
+							/>
+							<ExtraButton
+								icon="reset"
+								tooltip="reset"
+								onClick={() => resetModelField('googleImeBatchMaxWidthPx')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Google IME batch max height (px)',
+					desc: 'Maximum merged batch height for auto Google mode before flushing a new request.',
+					control: (
+						<>
+							<Text
+								value={`${settings.handwritingRecognition?.googleImeBatchMaxHeightPx ?? ''}`}
+								placeholder={`${DEFAULT_SETTINGS.handwritingRecognition.googleImeBatchMaxHeightPx}`}
+								onChange={onGoogleImeBatchMaxHeightPxChange}
+							/>
+							<ExtraButton
+								icon="reset"
+								tooltip="reset"
+								onClick={() => resetModelField('googleImeBatchMaxHeightPx')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Google IME batch max groups',
+					desc: 'Maximum grouped candidates per merged Google batch.',
+					control: (
+						<>
+							<Text
+								value={`${settings.handwritingRecognition?.googleImeBatchMaxGroups ?? ''}`}
+								placeholder={`${DEFAULT_SETTINGS.handwritingRecognition.googleImeBatchMaxGroups}`}
+								onChange={onGoogleImeBatchMaxGroupsChange}
+							/>
+							<ExtraButton
+								icon="reset"
+								tooltip="reset"
+								onClick={() => resetModelField('googleImeBatchMaxGroups')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Google IME batch max strokes',
+					desc: 'Maximum raw stroke count allowed in one merged Google batch.',
+					control: (
+						<>
+							<Text
+								value={`${settings.handwritingRecognition?.googleImeBatchMaxStrokes ?? ''}`}
+								placeholder={`${DEFAULT_SETTINGS.handwritingRecognition.googleImeBatchMaxStrokes}`}
+								onChange={onGoogleImeBatchMaxStrokesChange}
+							/>
+							<ExtraButton
+								icon="reset"
+								tooltip="reset"
+								onClick={() => resetModelField('googleImeBatchMaxStrokes')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Google IME batch max points',
+					desc: 'Maximum total point count in one merged batch before flushing.',
+					control: (
+						<>
+							<Text
+								value={`${settings.handwritingRecognition?.googleImeBatchMaxPoints ?? ''}`}
+								placeholder={`${DEFAULT_SETTINGS.handwritingRecognition.googleImeBatchMaxPoints}`}
+								onChange={onGoogleImeBatchMaxPointsChange}
+							/>
+							<ExtraButton
+								icon="reset"
+								tooltip="reset"
+								onClick={() => resetModelField('googleImeBatchMaxPoints')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Google IME batch boundary gap (ms)',
+					desc: 'Flush batch if the next group starts after this time gap.',
+					control: (
+						<>
+							<Text
+								value={`${settings.handwritingRecognition?.googleImeBatchBoundaryTimeGapMs ?? ''}`}
+								placeholder={`${DEFAULT_SETTINGS.handwritingRecognition.googleImeBatchBoundaryTimeGapMs}`}
+								onChange={onGoogleImeBatchBoundaryTimeGapMsChange}
+							/>
+							<ExtraButton
+								icon="reset"
+								tooltip="reset"
+								onClick={() => resetModelField('googleImeBatchBoundaryTimeGapMs')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Google IME batch idle flush (ms)',
+					desc: 'Reserved for idle-triggered flushing in follow-up wiring.',
+					control: (
+						<>
+							<Text
+								value={`${settings.handwritingRecognition?.googleImeBatchIdleFlushMs ?? ''}`}
+								placeholder={`${DEFAULT_SETTINGS.handwritingRecognition.googleImeBatchIdleFlushMs}`}
+								onChange={onGoogleImeBatchIdleFlushMsChange}
+							/>
+							<ExtraButton
+								icon="reset"
+								tooltip="reset"
+								onClick={() => resetModelField('googleImeBatchIdleFlushMs')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Google IME batch hard max age (ms)',
+					desc: 'Flush batch if accumulated batch age exceeds this limit.',
+					control: (
+						<>
+							<Text
+								value={`${settings.handwritingRecognition?.googleImeBatchHardMaxAgeMs ?? ''}`}
+								placeholder={`${DEFAULT_SETTINGS.handwritingRecognition.googleImeBatchHardMaxAgeMs}`}
+								onChange={onGoogleImeBatchHardMaxAgeMsChange}
+							/>
+							<ExtraButton
+								icon="reset"
+								tooltip="reset"
+								onClick={() => resetModelField('googleImeBatchHardMaxAgeMs')}
 							/>
 						</>
 					),

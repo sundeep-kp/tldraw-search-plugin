@@ -46,6 +46,8 @@ export type NormalizedStrokePayload = {
 export type StrokeListenerOptions = {
 	debug?: boolean
 	onStrokeExtracted?: (result: StrokeExtractionResult) => void
+	onShapesRemoved?: (shapeIds: TLShapeId[]) => void
+	onShapesMoved?: (shapeIds: TLShapeId[]) => void
 }
 
 export type RecognitionStatus = 'pending' | 'success' | 'error'

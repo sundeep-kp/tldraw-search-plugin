@@ -34,6 +34,14 @@ export default function WorkspaceSettings() {
 		[manager]
 	)
 
+	const onDarkModeInvertChanged = useCallback(
+		async (value: boolean) => {
+			manager.settings.darkModeInvert = value
+			await manager.updateSettings(manager.settings)
+		},
+		[manager]
+	)
+
 	return (
 		<>
 			<Group heading='Markdown view'>
@@ -86,6 +94,22 @@ export default function WorkspaceSettings() {
 									value={settings.workspace.tldrMarkdownViewType}
 									onChange={onMarkdownViewTypeChanged}
 									disabled={!settings.workspace.switchMarkdownView}
+								/>
+							</>
+						),
+					}}
+				/>
+			</Group>
+			<Group heading='Display'>
+				<Setting
+					slots={{
+						name: 'Dark mode color inversion',
+						desc: 'Invert all colors for a dark mode appearance.',
+						control: (
+							<>
+								<Toggle
+									value={settings.darkModeInvert}
+									onChange={onDarkModeInvertChanged}
 								/>
 							</>
 						),

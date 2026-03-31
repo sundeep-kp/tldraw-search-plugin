@@ -183,4 +183,27 @@ export function registerCommands(plugin: TldrawPlugin) {
 			plugin.instance.auditSessionManager.openModal()
 		},
 	})
+
+	plugin.addCommand({
+		id: 'handwriting-search-open',
+		name: 'Handwriting: Search recognized text',
+		checkCallback: (checking: boolean) => {
+			const hasCurrEditor = !!plugin.currTldrawEditor
+			if (plugin.settings.debugMode) {
+				console.log('[handwriting-search] command checkCallback', {
+					checking,
+					hasCurrEditor,
+					hasTrigger: !!plugin.onTriggerHandwritingSearch,
+				})
+			}
+			if (checking) return hasCurrEditor
+			
+			if (hasCurrEditor && plugin.onTriggerHandwritingSearch) {
+				if (plugin.settings.debugMode) {
+					console.log('[handwriting-search] command executing trigger')
+				}
+				plugin.onTriggerHandwritingSearch()
+			}
+		},
+	})
 }

@@ -75,6 +75,7 @@ export default class TldrawPlugin extends Plugin {
 	readonly tldrawFileMetadataListeners = new TldrawFileListenerMap(this)
 	readonly tlDataDocumentStoreManager = new TLDataDocumentStoreManager(this)
 	currTldrawEditor?: Editor
+	onTriggerHandwritingSearch?: () => void
 
 	// misc:
 	embedBoundsSelectorIcon: string

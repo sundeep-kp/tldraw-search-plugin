@@ -4,7 +4,7 @@ import { StrokeListenerOptions } from 'src/handwriting/types'
 import { Editor } from 'tldraw'
 
 export function useStrokeListener(editor: Editor | undefined, options: StrokeListenerOptions) {
-	const { debug = false, onStrokeExtracted } = options
+	const { debug = false, onStrokeExtracted, onShapesRemoved, onShapesMoved } = options
 
 	React.useEffect(() => {
 		if (!editor) return
@@ -12,6 +12,8 @@ export function useStrokeListener(editor: Editor | undefined, options: StrokeLis
 		return initializeStrokeListener(editor, {
 			debug,
 			onStrokeExtracted,
+			onShapesRemoved,
+			onShapesMoved,
 		})
-	}, [debug, editor, onStrokeExtracted])
+	}, [debug, editor, onShapesMoved, onShapesRemoved, onStrokeExtracted])
 }

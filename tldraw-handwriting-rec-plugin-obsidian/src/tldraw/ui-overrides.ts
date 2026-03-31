@@ -25,17 +25,23 @@ import {
 const DEFAULT_CAMERA_STEPS = [0.1, 0.25, 0.5, 1, 2, 4, 8]
 
 export const PLUGIN_ACTION_TOGGLE_ZOOM_LOCK = 'toggle-zoom-lock'
+export const PLUGIN_ACTION_HANDWRITING_SEARCH = 'handwriting-search'
 
 export function uiOverrides(plugin: TldrawPlugin): TLUiOverrides {
 	const trackEvent = useUiEvents()
 	return {
 		tools(editor, tools, helpers) {
-			// console.log(tools);
-			// // this is how you would override the kbd shortcuts
-			// tools.draw = {
-			// 	...tools.draw,
-			// 	kbd: "!q",
-			// };
+				tools.pencil = {
+					...tools.draw,
+					id: 'pencil',
+					label: 'tool.draw',
+					icon: 'tool-pencil',
+					kbd: 'shift+p',
+					onSelect(source) {
+						editor.setCurrentTool('pencil')
+						trackEvent('select-tool', { source, id: 'pencil' })
+					},
+				}
 			return tools
 		},
 		actions: (editor, actions, { msg, addDialog, addToast, paste }) => {
@@ -80,6 +86,21 @@ export function uiOverrides(plugin: TldrawPlugin): TLUiOverrides {
 					editor.setCameraOptions({
 						zoomSteps: isCameraZoomLockedAlready ? DEFAULT_CAMERA_STEPS : [editor.getZoomLevel()],
 					})
+				},
+			}
+
+			actions[PLUGIN_ACTION_HANDWRITING_SEARCH] = {
+				id: PLUGIN_ACTION_HANDWRITING_SEARCH,
+				label: {
+					default: 'Search handwriting',
+				},
+				icon: 'search',
+				kbd: '$f',
+				readonlyOk: false,
+				onSelect() {
+					if (plugin.onTriggerHandwritingSearch) {
+						plugin.onTriggerHandwritingSearch()
+					}
 				},
 			}
 

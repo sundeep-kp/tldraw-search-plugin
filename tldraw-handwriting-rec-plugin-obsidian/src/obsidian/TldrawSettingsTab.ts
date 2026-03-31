@@ -93,6 +93,7 @@ export interface TldrawPluginSettings extends DeprecatedFileDestinationSettings 
 	newFileTimeFormat: string
 	toolSelected: string
 	themeMode: ThemePreference
+	darkModeInvert: boolean
 	gridMode: boolean
 	snapMode: boolean
 	debugMode: boolean
@@ -159,6 +160,15 @@ export interface TldrawPluginSettings extends DeprecatedFileDestinationSettings 
 	handwritingRecognition?: {
 		backend?: 'auto' | 'onnx-web' | 'google-ime-js'
 		manualPredictButton?: boolean
+		pencilBrushSizePx?: number
+		searchZoomMinSizePx?: number
+		pressureSensitivity?: number
+		pencilTextureIntensity?: number
+		pencilTextureEnabled?: boolean
+		showRecognizedBatchTextOverlay?: boolean
+		recognitionDebounceMs?: number
+		strokeGroupingMaxTimeDeltaMs?: number
+		strokeGroupingAdaptiveGapMultiplier?: number
 		modelUrl?: string
 		alphabet?: string[] | string
 		inputName?: string
@@ -170,6 +180,14 @@ export interface TldrawPluginSettings extends DeprecatedFileDestinationSettings 
 		googleImeLanguage?: string
 		googleImeNumOfWords?: number
 		googleImeNumOfReturn?: number
+		googleImeBatchMaxWidthPx?: number
+		googleImeBatchMaxHeightPx?: number
+		googleImeBatchMaxGroups?: number
+		googleImeBatchMaxStrokes?: number
+		googleImeBatchMaxPoints?: number
+		googleImeBatchBoundaryTimeGapMs?: number
+		googleImeBatchIdleFlushMs?: number
+		googleImeBatchHardMaxAgeMs?: number
 	}
 }
 
@@ -179,6 +197,7 @@ export const DEFAULT_SETTINGS = {
 	newFileTimeFormat: 'YYYY-MM-DD h.mmA',
 	toolSelected: 'select',
 	themeMode: 'light',
+	darkModeInvert: false,
 	gridMode: false,
 	snapMode: false,
 	debugMode: false,
@@ -205,6 +224,15 @@ export const DEFAULT_SETTINGS = {
 	handwritingRecognition: {
 		backend: 'auto',
 		manualPredictButton: true,
+		pencilBrushSizePx: 24,
+		searchZoomMinSizePx: 64,
+		pressureSensitivity: 2.5,
+		pencilTextureIntensity: 0.35,
+		pencilTextureEnabled: true,
+		showRecognizedBatchTextOverlay: false,
+		recognitionDebounceMs: 900,
+		strokeGroupingMaxTimeDeltaMs: 1200,
+		strokeGroupingAdaptiveGapMultiplier: 1,
 		modelUrl: '',
 		alphabet: [],
 		inputName: 'input',
@@ -216,6 +244,14 @@ export const DEFAULT_SETTINGS = {
 		googleImeLanguage: 'en',
 		googleImeNumOfWords: 0,
 		googleImeNumOfReturn: 5,
+		googleImeBatchMaxWidthPx: 700,
+		googleImeBatchMaxHeightPx: 700,
+		googleImeBatchMaxGroups: 8,
+		googleImeBatchMaxStrokes: 50,
+		googleImeBatchMaxPoints: 3500,
+		googleImeBatchBoundaryTimeGapMs: 1100,
+		googleImeBatchIdleFlushMs: 1400,
+		googleImeBatchHardMaxAgeMs: 7000,
 	},
 } as const satisfies Partial<TldrawPluginSettings>
 

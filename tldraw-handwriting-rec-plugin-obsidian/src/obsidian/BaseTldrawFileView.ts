@@ -12,6 +12,7 @@ import { TLDataDocumentStore } from 'src/utils/document'
 import { parseDeepLinkString, TLDeepLink } from 'tldraw'
 import { intercept, Interceptor, MethodKeys } from '../utils/decorators/methods'
 import TldrawAssetsModal from './modal/TldrawAssetsModal'
+import PencilTool from 'src/tldraw/tools/pencil-tool'
 
 export interface DataUpdate {
 	getData(): string
@@ -215,6 +216,7 @@ export abstract class BaseTldrawFileView<View extends FileView = FileView> {
 			components: {
 				InFrontOfTheCanvas,
 			},
+			tools: [PencilTool],
 			onEditorMount: (editor) => {
 				const viewState = this.fileView.getEphemeralState()
 				console.log(this.#deepLink)

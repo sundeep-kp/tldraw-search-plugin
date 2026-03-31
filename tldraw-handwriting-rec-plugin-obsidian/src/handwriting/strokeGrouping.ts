@@ -1,10 +1,12 @@
 import { NormalizedStrokePayload, StrokeBounds } from 'src/handwriting/types'
+import { calculateAdaptiveGroupingGaps } from 'src/handwriting/adaptiveGrouping'
 import { TLShapeId } from 'tldraw'
 
 export type StrokeGroupingOptions = {
 	maxTimeDeltaMs?: number
 	maxHorizontalGapPx?: number
 	maxVerticalCenterDistancePx?: number
+	adaptiveGapMultiplier?: number
 	minShapesPerGroup?: number
 }
 
@@ -53,17 +55,30 @@ function mergeBounds(a: StrokeBounds, b: StrokeBounds): StrokeBounds {
 function canJoinGroup(
 	group: StrokeGroupCandidate,
 	next: NormalizedStrokePayload,
-	options: Required<StrokeGroupingOptions>
+	options: Required<Omit<StrokeGroupingOptions, 'adaptiveGapMultiplier'>> & {
+		adaptiveGapMultiplier?: number
+	}
 ): boolean {
 	const previous = group.payloads[group.payloads.length - 1]
 	const timeDeltaMs = next.timestamp - previous.timestamp
 	if (timeDeltaMs > options.maxTimeDeltaMs) return false
 
+	const adaptiveThresholds =
+		typeof options.adaptiveGapMultiplier === 'number'
+			? calculateAdaptiveGroupingGaps(next.worldBounds, group.boundingBox, {
+					multiplier: options.adaptiveGapMultiplier,
+			  })
+			: undefined
+
+	const horizontalGapLimit = adaptiveThresholds?.horizontalGapPx ?? options.maxHorizontalGapPx
+	const verticalCenterGapLimit =
+		adaptiveThresholds?.verticalCenterDistancePx ?? options.maxVerticalCenterDistancePx
+
 	const horizontalGap = computeHorizontalGap(previous.worldBounds, next.worldBounds)
-	if (horizontalGap > options.maxHorizontalGapPx) return false
+	if (horizontalGap > horizontalGapLimit) return false
 
 	const verticalCenterDistance = Math.abs(centerY(previous.worldBounds) - centerY(next.worldBounds))
-	if (verticalCenterDistance > options.maxVerticalCenterDistancePx) return false
+	if (verticalCenterDistance > verticalCenterGapLimit) return false
 
 	return true
 }

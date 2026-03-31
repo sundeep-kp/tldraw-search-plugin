@@ -22,27 +22,56 @@ function logDebug(enabled: boolean, message: string, ...args: unknown[]) {
 
 export function initializeStrokeListener(
 	editor: Editor,
-	{ debug = false, onStrokeExtracted }: StrokeListenerOptions = {}
+	{ debug = false, onStrokeExtracted, onShapesRemoved, onShapesMoved }: StrokeListenerOptions = {}
 ) {
 	const processedShapeIds = new Set<TLShapeId>()
 	logDebug(debug, 'stroke listener initialized')
 
 	return editor.store.listen(
 		(update: HistoryEntry<TLRecord>) => {
+			const movedShapeIds = new Set<TLShapeId>()
 			const removed = update?.changes?.removed
 			if (removed) {
+				const removedDrawShapeIds: TLShapeId[] = []
 				for (const shapeId of Object.keys(removed) as TLShapeId[]) {
 					processedShapeIds.delete(shapeId)
+					const record = removed[shapeId]
+					if (isDrawShape(record)) {
+						removedDrawShapeIds.push(shapeId)
+					}
+				}
+
+				if (removedDrawShapeIds.length > 0) {
+					onShapesRemoved?.(removedDrawShapeIds)
 				}
 			}
 
 			const addedRecords = Object.values(update?.changes?.added ?? {})
-			const updatedRecords = Object.values(update?.changes?.updated ?? {}).map(([, to]) => to)
+			const updatedEntries = Object.entries(update?.changes?.updated ?? {}) as [
+				TLShapeId,
+				[TLRecord, TLRecord],
+			][]
+
+			for (const [shapeId, [from, to]] of updatedEntries) {
+				if (!isCompletedDrawShape(to)) continue
+				if (!isCompletedDrawShape(from)) continue
+
+				if (from.x !== to.x || from.y !== to.y) {
+					movedShapeIds.add(shapeId)
+				}
+			}
+
+			if (movedShapeIds.size > 0) {
+				onShapesMoved?.(Array.from(movedShapeIds))
+			}
+
+			const updatedRecords = updatedEntries.map(([, [, to]]) => to)
 
 			for (const record of [...addedRecords, ...updatedRecords]) {
 				if (!isCompletedDrawShape(record)) continue
 
 				const shapeId = record.id as TLShapeId
+				if (movedShapeIds.has(shapeId)) continue
 				if (processedShapeIds.has(shapeId)) {
 					logDebug(debug, 'skipped duplicate draw shape', shapeId)
 					continue
