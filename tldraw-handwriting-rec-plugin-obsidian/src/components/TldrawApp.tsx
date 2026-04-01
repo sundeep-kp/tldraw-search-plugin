@@ -1,5 +1,5 @@
 import Fuse from 'fuse.js'
-import { Platform } from 'obsidian'
+import { Menu, Notice, Platform, TAbstractFile, TFile } from 'obsidian'
 import * as React from 'react'
 import { createRoot } from 'react-dom/client'
 import { lockZoomIcon } from 'src/assets/data-icons'
@@ -42,7 +42,20 @@ import { CompletedDrawShape, StrokeExtractionResult } from 'src/handwriting/type
 import { useStrokeListener } from 'src/hooks/useStrokeListener'
 import { useTldrawAppEffects } from 'src/hooks/useTldrawAppHook'
 import TldrawPlugin from 'src/main'
-import { PLUGIN_ACTION_TOGGLE_ZOOM_LOCK, PLUGIN_ACTION_HANDWRITING_SEARCH, uiOverrides } from 'src/tldraw/ui-overrides'
+import { FileSearchModal } from 'src/obsidian/modal/FileSearchModal'
+import {
+	acquireDocumentAnchorStickerScope,
+	getAnchorSticker,
+	getDocumentAnchorStickers,
+	removeAnchorSticker,
+	upsertAnchorSticker,
+	releaseDocumentAnchorStickerScope,
+} from 'src/tldraw/anchorStickerStore'
+import {
+	PLUGIN_ACTION_TOGGLE_ZOOM_LOCK,
+	PLUGIN_ACTION_HANDWRITING_SEARCH,
+	uiOverrides,
+} from 'src/tldraw/ui-overrides'
 import { TLDataDocumentStore } from 'src/utils/document'
 import { PTLEditorBlockBlur } from 'src/utils/dom-attributes'
 import {
@@ -163,7 +176,7 @@ const BRUSH_SIZE_STEPS: TLDefaultSizeStyle[] = ['s', 'm', 'l', 'xl']
 const PENCIL_BRUSH_MIN_PX = 1
 const PENCIL_BRUSH_MAX_PX = 600
 const DEFAULT_PENCIL_BRUSH_PX = 24
-const PENCIL_SCRUB_MAX_DISTANCE_PX = 420
+const PENCIL_SCRUB_PX_PER_SCREEN_PIXEL = 0.25
 
 function getStrokeWidthForSize(size: TLDefaultSizeStyle): number {
 	switch (size) {
@@ -325,8 +338,58 @@ type SearchPanelResult = {
 	}
 }
 
+type AnchorStickerOverlay = {
+	shapeId: string
+	targetPath: string
+	targetDisplay: string
+	targetWikilink: string
+	left: number
+	top: number
+}
+
 const DEFAULT_SEARCH_FOCUS_MIN_SIZE = 64
 const SEARCH_FOCUS_PADDING = 20
+const ANCHOR_MENTIONS_FRONTMATTER_KEY = 'tldraw-canvas-mentions'
+const ANCHOR_MENTION_TOKENS_FRONTMATTER_KEY = 'tldraw-canvas-mention-shapes'
+
+function createAnchorShapeId() {
+	return `shape:anchor-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function resolveAnchorPlacementPoint(editor: Editor): { x: number; y: number } {
+	const pointer = editor.inputs.currentPagePoint as { x?: number; y?: number } | undefined
+	if (pointer && Number.isFinite(pointer.x) && Number.isFinite(pointer.y)) {
+		return { x: pointer.x as number, y: pointer.y as number }
+	}
+
+	const viewportBounds = editor.getViewportPageBounds()
+	return {
+		x: viewportBounds.x + viewportBounds.w / 2,
+		y: viewportBounds.y + viewportBounds.h / 2,
+	}
+}
+
+function buildAnchorMention(canvasPath: string) {
+	return `[[${canvasPath}]]`
+}
+
+function buildAnchorMentionToken(canvasPath: string, shapeId: string) {
+	return `${canvasPath}#${shapeId}`
+}
+
+function parseCanvasPathFromMentionToken(value: string): string | undefined {
+	if (value.startsWith('[[') && value.includes(']]#')) {
+		const end = value.indexOf(']]#')
+		if (end > 2) return value.slice(2, end)
+	}
+
+	const hashIndex = value.lastIndexOf('#')
+	if (hashIndex > 0) {
+		return value.slice(0, hashIndex)
+	}
+
+	return undefined
+}
 
 function clampUnit(value: number): number {
 	if (!Number.isFinite(value)) return 0.5
@@ -489,6 +552,7 @@ const TldrawApp = ({
 	}, [store])
 	const showRecognizedBatchTextOverlay =
 		!!userSettings.handwritingRecognition?.showRecognizedBatchTextOverlay
+	const enableAnchorBacklinks = !!userSettings.handwritingRecognition?.anchorBacklinksEnabled
 	const searchZoomMinSize = React.useMemo(() => {
 		const configured = userSettings.handwritingRecognition?.searchZoomMinSizePx
 		if (typeof configured !== 'number' || !Number.isFinite(configured)) {
@@ -1018,7 +1082,9 @@ const TldrawApp = ({
 		const scrubState = {
 			active: false,
 			anchorX: 0,
-			anchorY: 0,
+			startBrushPx: clampBrushPx(
+				userSettings.handwritingRecognition?.pencilBrushSizePx ?? DEFAULT_PENCIL_BRUSH_PX
+			),
 			brushPx: clampBrushPx(
 				userSettings.handwritingRecognition?.pencilBrushSizePx ?? DEFAULT_PENCIL_BRUSH_PX
 			),
@@ -1092,15 +1158,12 @@ const TldrawApp = ({
 				if (!scrubState.active) {
 					scrubState.active = true
 					scrubState.anchorX = currentPoint.x
-					scrubState.anchorY = currentPoint.y
+					scrubState.startBrushPx = scrubState.brushPx
 				}
 
 				const dx = currentPoint.x - scrubState.anchorX
-				const dy = currentPoint.y - scrubState.anchorY
-				const distance = Math.sqrt(dx * dx + dy * dy)
-				const t = Math.max(0, Math.min(1, distance / PENCIL_SCRUB_MAX_DISTANCE_PX))
 				scrubState.brushPx = clampBrushPx(
-					PENCIL_BRUSH_MIN_PX + t * (PENCIL_BRUSH_MAX_PX - PENCIL_BRUSH_MIN_PX)
+					scrubState.startBrushPx + dx * PENCIL_SCRUB_PX_PER_SCREEN_PIXEL
 				)
 			} else {
 				maybeFinishScrub()
@@ -1576,6 +1639,206 @@ const TldrawApp = ({
 		]
 	)
 
+	const chooseAnchorTarget = React.useCallback(() => {
+		return new Promise<TAbstractFile | string | undefined>((resolve) => {
+			let settled = false
+			const settle = (value: TAbstractFile | string | undefined) => {
+				if (settled) return
+				settled = true
+				resolve(value)
+			}
+
+			new FileSearchModal(plugin, {
+				allowAnyPath: true,
+				selectDir: false,
+				onEmptyStateText: (searchPath) => `No vault files found in ${searchPath}`,
+				setSelection: (selection) => settle(selection),
+				onClose: () => settle(undefined),
+			}).open()
+		})
+	}, [plugin])
+
+	const maybeWriteReverseBacklink = React.useCallback(
+		async (targetFile: TFile, canvasPath: string, shapeId: string) => {
+			if (!enableAnchorBacklinks) return
+			const graphMention = buildAnchorMention(canvasPath)
+			const token = buildAnchorMentionToken(canvasPath, shapeId)
+
+			await plugin.app.fileManager.processFrontMatter(targetFile, (frontMatter) => {
+				const existingMentions = Array.isArray(frontMatter[ANCHOR_MENTIONS_FRONTMATTER_KEY])
+					? frontMatter[ANCHOR_MENTIONS_FRONTMATTER_KEY]
+					: []
+				const mentionSet = new Set<string>(
+					existingMentions.filter((value: unknown): value is string => typeof value === 'string')
+				)
+				mentionSet.add(graphMention)
+				frontMatter[ANCHOR_MENTIONS_FRONTMATTER_KEY] = Array.from(mentionSet.values()).sort()
+
+				const existingTokens = Array.isArray(frontMatter[ANCHOR_MENTION_TOKENS_FRONTMATTER_KEY])
+					? frontMatter[ANCHOR_MENTION_TOKENS_FRONTMATTER_KEY]
+					: []
+				const tokenSet = new Set<string>(
+					existingTokens.filter((value: unknown): value is string => typeof value === 'string')
+				)
+				tokenSet.add(token)
+				frontMatter[ANCHOR_MENTION_TOKENS_FRONTMATTER_KEY] = Array.from(tokenSet.values()).sort()
+			})
+		},
+		[enableAnchorBacklinks, plugin]
+	)
+
+	const maybeRemoveReverseBacklink = React.useCallback(
+		async (targetPath: string, canvasPath: string, shapeId: string) => {
+			if (!enableAnchorBacklinks) return
+			const target = plugin.app.vault.getAbstractFileByPath(targetPath)
+			if (!(target instanceof TFile)) return
+
+			const graphMention = buildAnchorMention(canvasPath)
+			const token = buildAnchorMentionToken(canvasPath, shapeId)
+			const legacyToken = `[[${canvasPath}]]#${shapeId}`
+
+			await plugin.app.fileManager.processFrontMatter(target, (frontMatter) => {
+				const existingMentions = Array.isArray(frontMatter[ANCHOR_MENTIONS_FRONTMATTER_KEY])
+					? frontMatter[ANCHOR_MENTIONS_FRONTMATTER_KEY]
+					: []
+				const mentionSet = new Set<string>(
+					existingMentions.filter((value: unknown): value is string => typeof value === 'string')
+				)
+
+				const existingTokens = Array.isArray(frontMatter[ANCHOR_MENTION_TOKENS_FRONTMATTER_KEY])
+					? frontMatter[ANCHOR_MENTION_TOKENS_FRONTMATTER_KEY]
+					: []
+				const nextTokens = existingTokens
+					.filter((value: unknown): value is string => typeof value === 'string')
+					.filter((value) => value !== token && value !== legacyToken)
+
+				if (nextTokens.length === 0) {
+					delete frontMatter[ANCHOR_MENTION_TOKENS_FRONTMATTER_KEY]
+				} else {
+					frontMatter[ANCHOR_MENTION_TOKENS_FRONTMATTER_KEY] = Array.from(new Set(nextTokens)).sort()
+				}
+
+				mentionSet.delete(graphMention)
+				for (const nextToken of nextTokens) {
+					const nextPath = parseCanvasPathFromMentionToken(nextToken)
+					if (!nextPath) continue
+					mentionSet.add(buildAnchorMention(nextPath))
+				}
+
+				if (mentionSet.size === 0) {
+					delete frontMatter[ANCHOR_MENTIONS_FRONTMATTER_KEY]
+					return
+				}
+
+				frontMatter[ANCHOR_MENTIONS_FRONTMATTER_KEY] = Array.from(mentionSet.values()).sort()
+			})
+		},
+		[enableAnchorBacklinks, plugin]
+	)
+
+	const onAnyShapesRemoved = React.useCallback(
+		(shapeIds: string[]) => {
+			if (!Array.isArray(shapeIds) || shapeIds.length === 0) return
+			const canvasPath = plugin.app.workspace.getActiveFile()?.path
+			let removedCount = 0
+			for (const shapeId of shapeIds) {
+				const existing = getAnchorSticker(handwritingDocumentId, shapeId)
+				if (!existing) continue
+				if (canvasPath) {
+					void maybeRemoveReverseBacklink(existing.targetPath, canvasPath, shapeId)
+				}
+				removeAnchorSticker(handwritingDocumentId, shapeId)
+				removedCount += 1
+			}
+			if (removedCount > 0) {
+				setOverlayRenderTick((tick) => tick + 1)
+			}
+		},
+		[handwritingDocumentId, maybeRemoveReverseBacklink, plugin]
+	)
+
+	const triggerAnchorStickerAssign = React.useCallback(async () => {
+		if (!editor) return
+		const canvasFile = plugin.app.workspace.getActiveFile()
+		if (!canvasFile) {
+			new Notice('Open a canvas file before assigning anchor stickers.')
+			return
+		}
+
+		const selectedShapeIds = Array.from(editor.getSelectedShapeIds())
+		let shapeId = selectedShapeIds[0]
+		let createdShapeId: string | undefined
+
+		if (!shapeId) {
+			const placementPoint = resolveAnchorPlacementPoint(editor)
+			createdShapeId = createAnchorShapeId()
+			shapeId = createdShapeId
+
+			try {
+				editor.createShape({
+					id: createdShapeId,
+					type: 'text',
+					x: placementPoint.x,
+					y: placementPoint.y,
+				} as never)
+				editor.select(shapeId)
+			} catch (error) {
+				new Notice(`Unable to place anchor sticker: ${String(error)}`)
+				return
+			}
+		}
+
+		const selection = await chooseAnchorTarget()
+		if (!selection) {
+			if (createdShapeId) {
+				editor.deleteShape(createdShapeId)
+			}
+			return
+		}
+
+		const sourcePath = plugin.app.workspace.getActiveFile()?.path ?? ''
+		const targetPath = typeof selection === 'string' ? selection : selection.path
+		const resolvedTarget = plugin.app.vault.getAbstractFileByPath(targetPath)
+		const previousSticker = getAnchorSticker(handwritingDocumentId, shapeId)
+
+		const targetFile = selection instanceof TFile ? selection : resolvedTarget instanceof TFile ? resolvedTarget : undefined
+		const targetDisplay = targetFile
+			? plugin.app.metadataCache.fileToLinktext(targetFile, sourcePath)
+			: targetPath
+		const targetWikilink = targetFile
+			? plugin.app.fileManager.generateMarkdownLink(targetFile, sourcePath)
+			: `[[${targetPath}]]`
+
+		const now = Date.now()
+		upsertAnchorSticker(handwritingDocumentId, {
+			shapeId,
+			targetPath,
+			targetDisplay,
+			targetWikilink,
+			createdAt: now,
+			updatedAt: now,
+		})
+		setOverlayRenderTick((tick) => tick + 1)
+
+		if (targetFile) {
+			try {
+				if (previousSticker && previousSticker.targetPath !== targetPath) {
+					await maybeRemoveReverseBacklink(previousSticker.targetPath, canvasFile.path, shapeId)
+				}
+				await maybeWriteReverseBacklink(targetFile, canvasFile.path, shapeId)
+			} catch (error) {
+				new Notice(`Anchor assigned, but backlink update failed: ${String(error)}`)
+			}
+		}
+	}, [
+		chooseAnchorTarget,
+		editor,
+		handwritingDocumentId,
+		maybeRemoveReverseBacklink,
+		maybeWriteReverseBacklink,
+		plugin,
+	])
+
 	const onShapesMoved = React.useCallback(
 		(shapeIds: string[]) => {
 			if (!Array.isArray(shapeIds) || shapeIds.length === 0) return
@@ -1643,6 +1906,7 @@ const TldrawApp = ({
 		acquireDocumentStrokePayloadScope(handwritingDocumentId)
 		acquireDocumentWordCandidateScope(handwritingDocumentId)
 		acquireDocumentRecognitionScope(handwritingDocumentId)
+		acquireDocumentAnchorStickerScope(handwritingDocumentId)
 
 		return () => {
 			if (recognitionDebounceTimerRef.current) {
@@ -1654,6 +1918,7 @@ const TldrawApp = ({
 			releaseDocumentStrokePayloadScope(handwritingDocumentId)
 			releaseDocumentWordCandidateScope(handwritingDocumentId)
 			releaseDocumentRecognitionScope(handwritingDocumentId)
+			releaseDocumentAnchorStickerScope(handwritingDocumentId)
 		}
 	}, [handwritingDocumentId])
 
@@ -1668,15 +1933,97 @@ const TldrawApp = ({
 		plugin.onTriggerHandwritingSearch = () => {
 			setIsSearchPanelOpen((current) => !current)
 		}
+		plugin.onTriggerAnchorStickerAssign = () => {
+			void triggerAnchorStickerAssign()
+		}
 		return () => {
 			plugin.onTriggerHandwritingSearch = undefined
+			plugin.onTriggerAnchorStickerAssign = undefined
 		}
-	}, [plugin])
+	}, [plugin, triggerAnchorStickerAssign])
+
+	const anchorStickerOverlays = React.useMemo<AnchorStickerOverlay[]>(() => {
+		if (!editor) return []
+		return getDocumentAnchorStickers(handwritingDocumentId)
+			.map((sticker) => {
+				const shape = editor.getShape(sticker.shapeId)
+				if (!shape) return null
+				const viewportPoint = editor.pageToViewport({ x: shape.x, y: shape.y })
+				return {
+					shapeId: sticker.shapeId,
+					targetPath: sticker.targetPath,
+					targetDisplay: sticker.targetDisplay,
+					targetWikilink: sticker.targetWikilink,
+					left: viewportPoint.x,
+					top: viewportPoint.y,
+				}
+			})
+			.filter((overlay): overlay is AnchorStickerOverlay => overlay !== null)
+	}, [editor, handwritingDocumentId, overlayRenderTick])
+
+	const openAnchorTarget = React.useCallback(
+		(targetPath: string) => {
+			const target = plugin.app.vault.getAbstractFileByPath(targetPath)
+			if (!(target instanceof TFile)) {
+				new Notice(`Linked file not found: ${targetPath}`)
+				return
+			}
+			void plugin.app.workspace.getLeaf(false).openFile(target)
+		},
+		[plugin]
+	)
+
+	const deleteAnchorSticker = React.useCallback(
+		(shapeId: string) => {
+			if (!editor) return
+			editor.deleteShape(shapeId)
+			setOverlayRenderTick((tick) => tick + 1)
+		},
+		[editor]
+	)
+
+	const onAnchorStickerContextMenu = React.useCallback(
+		(event: React.MouseEvent<HTMLButtonElement>, shapeId: string) => {
+			event.preventDefault()
+			event.stopPropagation()
+
+			const menu = new Menu(plugin.app)
+			menu.addItem((item) => {
+				item
+					.setTitle('Delete anchor sticker')
+					.setIcon('trash')
+					.onClick(() => deleteAnchorSticker(shapeId))
+			})
+			menu.showAtMouseEvent(event.nativeEvent)
+		},
+		[deleteAnchorSticker, plugin.app]
+	)
+
+	React.useEffect(() => {
+		if (!editor) return
+		if (anchorStickerOverlays.length === 0) return
+
+		let animationFrameId = 0
+		let disposed = false
+		const tick = () => {
+			if (disposed) return
+			setOverlayRenderTick((value) => value + 1)
+			animationFrameId = requestAnimationFrame(tick)
+		}
+
+		animationFrameId = requestAnimationFrame(tick)
+
+		return () => {
+			disposed = true
+			cancelAnimationFrame(animationFrameId)
+		}
+	}, [anchorStickerOverlays.length, editor])
 
 	useStrokeListener(editor, {
 		debug: userSettings.debugMode,
 		onStrokeExtracted,
 		onShapesRemoved,
+		onAnyShapesRemoved,
 		onShapesMoved,
 	})
 
@@ -1880,6 +2227,21 @@ const TldrawApp = ({
 				setFocusedEditor(false, editor)
 			}}
 		>
+			{anchorStickerOverlays.map((overlay) => (
+				<button
+					type="button"
+					key={overlay.shapeId}
+					className="ptl-anchor-sticker-overlay"
+					style={{
+						transform: `translate(${overlay.left}px, ${overlay.top}px)`,
+					}}
+					onClick={() => openAnchorTarget(overlay.targetPath)}
+					onContextMenu={(event) => onAnchorStickerContextMenu(event, overlay.shapeId)}
+					title={overlay.targetWikilink}
+				>
+					{overlay.targetDisplay}
+				</button>
+			))}
 			{activeSearchHighlightBox ? (
 				<div
 					className="ptl-handwriting-search-hit-box"

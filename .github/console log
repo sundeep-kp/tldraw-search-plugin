@@ -1,0 +1,23 @@
+when i pressed ctrl + shift + A
+
+Something went wrong
+Please refresh your browser.
+
+If the issue continues after refreshing, you may need to reset the tldraw data stored on your device.
+
+Note: Resetting will erase your current project and any unsaved work.
+
+If you're developing with the SDK and need help, join us on Discord.
+
+At shape(type = text).props.text: Unexpected property
+ValidationError: At shape(type = text).props.text: Unexpected property
+    at prefixError (plugin:tldraw:47128:13)
+    at _Validator.eval [as validationFn] (plugin:tldraw:47653:14)
+    at _Validator.validate (plugin:tldraw:47163:28)
+    at _RecordType.validate (plugin:tldraw:45316:27)
+    at _StoreSchema.validateRecord (plugin:tldraw:46857:25)
+    at eval (plugin:tldraw:46298:32)
+    at eval (plugin:tldraw:46725:24)
+    at transact (plugin:tldraw:43376:12)
+    at Store.atomic (plugin:tldraw:46703:12)
+    at Store.put (plugin:tldraw:46272:10)

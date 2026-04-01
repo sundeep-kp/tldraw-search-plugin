@@ -22,7 +22,7 @@ function logDebug(enabled: boolean, message: string, ...args: unknown[]) {
 
 export function initializeStrokeListener(
 	editor: Editor,
-	{ debug = false, onStrokeExtracted, onShapesRemoved, onShapesMoved }: StrokeListenerOptions = {}
+	{ debug = false, onStrokeExtracted, onShapesRemoved, onAnyShapesRemoved, onShapesMoved }: StrokeListenerOptions = {}
 ) {
 	const processedShapeIds = new Set<TLShapeId>()
 	logDebug(debug, 'stroke listener initialized')
@@ -32,6 +32,7 @@ export function initializeStrokeListener(
 			const movedShapeIds = new Set<TLShapeId>()
 			const removed = update?.changes?.removed
 			if (removed) {
+				onAnyShapesRemoved?.(Object.keys(removed) as TLShapeId[])
 				const removedDrawShapeIds: TLShapeId[] = []
 				for (const shapeId of Object.keys(removed) as TLShapeId[]) {
 					processedShapeIds.delete(shapeId)

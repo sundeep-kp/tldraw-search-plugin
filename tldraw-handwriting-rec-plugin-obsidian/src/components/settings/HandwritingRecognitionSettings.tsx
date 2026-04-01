@@ -49,7 +49,8 @@ function HandwritingRecognitionSettingsGroup() {
 				| 'googleImeBatchMaxPoints'
 				| 'googleImeBatchBoundaryTimeGapMs'
 				| 'googleImeBatchIdleFlushMs'
-				| 'googleImeBatchHardMaxAgeMs',
+				| 'googleImeBatchHardMaxAgeMs'
+				| 'anchorBacklinksEnabled',
 			value: string | number | boolean
 		) => {
 			const current = settingsManager.settings.handwritingRecognition ?? {}
@@ -94,6 +95,7 @@ function HandwritingRecognitionSettingsGroup() {
 				| 'googleImeBatchBoundaryTimeGapMs'
 				| 'googleImeBatchIdleFlushMs'
 				| 'googleImeBatchHardMaxAgeMs'
+				| 'anchorBacklinksEnabled'
 		) => {
 			const defaults = DEFAULT_SETTINGS.handwritingRecognition
 			const current = settingsManager.settings.handwritingRecognition ?? {}
@@ -220,6 +222,13 @@ function HandwritingRecognitionSettingsGroup() {
 	const onShowRecognizedBatchTextOverlayChange = useCallback(
 		async (value: boolean) => {
 			await updateRecognitionField('showRecognizedBatchTextOverlay', value)
+		},
+		[updateRecognitionField]
+	)
+
+	const onAnchorBacklinksEnabledChange = useCallback(
+		async (value: boolean) => {
+			await updateRecognitionField('anchorBacklinksEnabled', value)
 		},
 		[updateRecognitionField]
 	)
@@ -543,8 +552,8 @@ function HandwritingRecognitionSettingsGroup() {
 			/>
 			<Setting
 				slots={{
-					name: 'Show recognized batch text overlay',
-					desc: 'Display recognized text over each handwriting batch bounding area on the canvas.',
+					name: 'Text recognition preview overlay',
+					desc: 'Enable or disable recognized text preview on top of handwriting regions on the canvas.',
 					control: (
 						<>
 							<Toggle
@@ -555,6 +564,25 @@ function HandwritingRecognitionSettingsGroup() {
 								icon="reset"
 								tooltip="reset"
 								onClick={() => resetModelField('showRecognizedBatchTextOverlay')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Anchor sticker reverse backlinks',
+					desc: 'When enabled, assigning an anchor sticker appends this canvas path to the linked note frontmatter list: tldraw-canvas-mentions.',
+					control: (
+						<>
+							<Toggle
+								value={!!settings.handwritingRecognition?.anchorBacklinksEnabled}
+								onChange={onAnchorBacklinksEnabledChange}
+							/>
+							<ExtraButton
+								icon="reset"
+								tooltip="reset"
+								onClick={() => resetModelField('anchorBacklinksEnabled')}
 							/>
 						</>
 					),

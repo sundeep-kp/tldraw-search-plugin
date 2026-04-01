@@ -47,6 +47,7 @@ export type StrokeListenerOptions = {
 	debug?: boolean
 	onStrokeExtracted?: (result: StrokeExtractionResult) => void
 	onShapesRemoved?: (shapeIds: TLShapeId[]) => void
+	onAnyShapesRemoved?: (shapeIds: TLShapeId[]) => void
 	onShapesMoved?: (shapeIds: TLShapeId[]) => void
 }
 

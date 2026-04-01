@@ -76,6 +76,7 @@ export default class TldrawPlugin extends Plugin {
 	readonly tlDataDocumentStoreManager = new TLDataDocumentStoreManager(this)
 	currTldrawEditor?: Editor
 	onTriggerHandwritingSearch?: () => void
+	onTriggerAnchorStickerAssign?: () => void
 
 	// misc:
 	embedBoundsSelectorIcon: string

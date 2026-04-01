@@ -206,4 +206,36 @@ export function registerCommands(plugin: TldrawPlugin) {
 			}
 		},
 	})
+
+	plugin.addCommand({
+		id: 'handwriting-toggle-recognition-preview',
+		name: 'Handwriting: Toggle recognition text preview',
+		checkCallback: (checking: boolean) => {
+			const hasCurrEditor = !!plugin.currTldrawEditor
+			if (checking) return hasCurrEditor
+
+			const current = !!plugin.settings.handwritingRecognition?.showRecognizedBatchTextOverlay
+			plugin.settings.handwritingRecognition = {
+				...(plugin.settings.handwritingRecognition ?? {}),
+				showRecognizedBatchTextOverlay: !current,
+			}
+
+			void plugin.settingsManager.updateSettings(plugin.settings)
+			new Notice(
+				`Handwriting recognition preview ${!current ? 'enabled' : 'disabled'}`
+			)
+		},
+	})
+
+	plugin.addCommand({
+		id: 'anchor-sticker-assign',
+		name: 'Anchor sticker: Create or assign link',
+		checkCallback: (checking: boolean) => {
+			const hasCurrEditor = !!plugin.currTldrawEditor
+			if (checking) return hasCurrEditor
+			if (hasCurrEditor) {
+				plugin.onTriggerAnchorStickerAssign?.()
+			}
+		},
+	})
 }

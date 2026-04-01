@@ -188,6 +188,7 @@ export interface TldrawPluginSettings extends DeprecatedFileDestinationSettings 
 		googleImeBatchBoundaryTimeGapMs?: number
 		googleImeBatchIdleFlushMs?: number
 		googleImeBatchHardMaxAgeMs?: number
+		anchorBacklinksEnabled?: boolean
 	}
 }
 
@@ -252,6 +253,7 @@ export const DEFAULT_SETTINGS = {
 		googleImeBatchBoundaryTimeGapMs: 1100,
 		googleImeBatchIdleFlushMs: 1400,
 		googleImeBatchHardMaxAgeMs: 7000,
+		anchorBacklinksEnabled: true,
 	},
 } as const satisfies Partial<TldrawPluginSettings>
 

@@ -26,6 +26,7 @@ const DEFAULT_CAMERA_STEPS = [0.1, 0.25, 0.5, 1, 2, 4, 8]
 
 export const PLUGIN_ACTION_TOGGLE_ZOOM_LOCK = 'toggle-zoom-lock'
 export const PLUGIN_ACTION_HANDWRITING_SEARCH = 'handwriting-search'
+export const PLUGIN_ACTION_ASSIGN_ANCHOR_STICKER = 'assign-anchor-sticker'
 
 export function uiOverrides(plugin: TldrawPlugin): TLUiOverrides {
 	const trackEvent = useUiEvents()
@@ -101,6 +102,19 @@ export function uiOverrides(plugin: TldrawPlugin): TLUiOverrides {
 					if (plugin.onTriggerHandwritingSearch) {
 						plugin.onTriggerHandwritingSearch()
 					}
+				},
+			}
+
+			actions[PLUGIN_ACTION_ASSIGN_ANCHOR_STICKER] = {
+				id: PLUGIN_ACTION_ASSIGN_ANCHOR_STICKER,
+				label: {
+					default: 'Assign anchor sticker',
+				},
+				icon: 'link',
+				kbd: '$shift+a',
+				readonlyOk: false,
+				onSelect() {
+					plugin.onTriggerAnchorStickerAssign?.()
 				},
 			}
 
