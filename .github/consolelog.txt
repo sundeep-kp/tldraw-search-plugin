@@ -1,0 +1,20 @@
+{
+    "documentId": "b2ca723d-741d-4665-98e9-fd9464734a74",
+    "shapeId": "shape:arijv1WYs7m-OA_WfaiuN",
+    "rawPointsCount": 568,
+    "pressurePointsCount": 651,
+    "pressureMin": 0,
+    "pressureMax": 1,
+    "pressureMean": 0.604,
+    "opacityMin": 0.06,
+    "opacityMax": 0.95,
+    "opacityMean": 0.5,
+    "opacityBuckets": [
+        189,
+        143,
+        41,
+        40,
+        238
+    ],
+    "opacityBucketsCsv": "189,143,41,40,238"
+}

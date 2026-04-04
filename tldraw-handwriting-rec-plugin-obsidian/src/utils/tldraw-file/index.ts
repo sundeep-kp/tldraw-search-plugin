@@ -1,4 +1,5 @@
 import { createTLStore, TldrawFile, TLStore } from 'tldraw'
+import { PENCIL_SHAPE_UTILS } from 'src/tldraw/rendering/pencil-draw-shape-util'
 
 /**
  *
@@ -6,7 +7,7 @@ import { createTLStore, TldrawFile, TLStore } from 'tldraw'
  * @returns
  */
 export function createRawTldrawFile(store?: TLStore): TldrawFile {
-	store ??= createTLStore()
+	store ??= createTLStore({ shapeUtils: PENCIL_SHAPE_UTILS })
 	return {
 		tldrawFileFormatVersion: 1,
 		schema: store.schema.serialize(),

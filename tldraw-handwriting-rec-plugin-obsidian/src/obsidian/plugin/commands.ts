@@ -9,6 +9,7 @@ import {
 	VIEW_TYPE_TLDRAW,
 } from 'src/utils/constants'
 import { importTldrawFile } from 'src/utils/file'
+import KritaBundleImportModal from 'src/obsidian/modal/KritaBundleImportModal'
 import { TLDRAW_FILE_EXTENSION } from 'tldraw'
 
 async function createTldrawFile(
@@ -174,6 +175,14 @@ export function registerCommands(plugin: TldrawPlugin) {
 	})
 
 	plugin.addCommand({
+		id: 'import-krita-brush-bundle',
+		name: 'Import Krita brush bundle',
+		callback: () => {
+			new KritaBundleImportModal(plugin.app, plugin).open()
+		},
+	})
+
+	plugin.addCommand({
 		id: 'open-vault-audit-modal',
 		name: '[Vault] Scan for loose assets',
 		checkCallback: (checking: boolean) => {
@@ -189,7 +198,7 @@ export function registerCommands(plugin: TldrawPlugin) {
 		name: 'Handwriting: Search recognized text',
 		checkCallback: (checking: boolean) => {
 			const hasCurrEditor = !!plugin.currTldrawEditor
-			if (plugin.settings.debugMode) {
+			if (plugin.settings.debugMode && plugin.settings.debugLogs?.handwritingSearch) {
 				console.log('[handwriting-search] command checkCallback', {
 					checking,
 					hasCurrEditor,
@@ -199,7 +208,7 @@ export function registerCommands(plugin: TldrawPlugin) {
 			if (checking) return hasCurrEditor
 			
 			if (hasCurrEditor && plugin.onTriggerHandwritingSearch) {
-				if (plugin.settings.debugMode) {
+				if (plugin.settings.debugMode && plugin.settings.debugLogs?.handwritingSearch) {
 					console.log('[handwriting-search] command executing trigger')
 				}
 				plugin.onTriggerHandwritingSearch()

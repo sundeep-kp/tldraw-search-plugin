@@ -23,10 +23,14 @@ import {
 	releaseDocumentRecognitionScope,
 	upsertRecognitionResult,
 } from 'src/handwriting/recognitionResultsStore'
-import { groupNormalizedStrokePayloads } from 'src/handwriting/strokeGrouping'
+import {
+	groupNormalizedStrokePayloads,
+	groupNormalizedStrokePayloadsBySpatialProximity,
+} from 'src/handwriting/strokeGrouping'
 import {
 	acquireDocumentStrokePayloadScope,
 	getAllNormalizedStrokePayloads,
+	getNormalizedStrokePayload,
 	removeNormalizedStrokePayload,
 	releaseDocumentStrokePayloadScope,
 	upsertNormalizedStrokePayload,
@@ -73,9 +77,12 @@ import {
 	DefaultMainMenu,
 	DefaultMainMenuContent,
 	Editor,
+	TLAnyShapeUtilConstructor,
 	type TLDefaultSizeStyle,
 	TLComponents,
 	Tldraw,
+	DEFAULT_EMBED_DEFINITIONS,
+	type TLEmbedDefinition,
 	TldrawEditorStoreProps,
 	TldrawUiMenuItem,
 	TldrawUiMenuSubmenu,
@@ -86,6 +93,7 @@ import {
 	TLUiEventHandler,
 	TLUiOverrides,
 	type TLUiStylePanelProps,
+	type VecLike,
 	useEditor,
 	useIsToolSelected,
 	useRelevantStyles,
@@ -93,6 +101,16 @@ import {
 	useActions,
 	useTools,
 } from 'tldraw'
+import {
+	PENCIL_SHAPE_UTILS,
+	setPencilBaseStrokeEnabled,
+	setPencilDefaultStrokeEnabled,
+	setPencilFallbackStylingEnabled,
+	setPencilCrossSectionAspectRatio,
+	setPencilOpacitySensitivity,
+	setPencilSampledOverlayEnabled,
+} from 'src/tldraw/rendering/pencil-draw-shape-util'
+import { getPressureOpacityStyle } from 'src/tldraw/rendering/pencil-texture'
 import PluginKeyboardShortcutsDialog from './PluginKeyboardShortcutsDialog'
 import PluginQuickActions from './PluginQuickActions'
 
@@ -106,6 +124,7 @@ type TldrawAppOptions = {
 	 */
 	initialTool?: string
 	hideUi?: boolean
+	shapeUtils?: readonly TLAnyShapeUtilConstructor[]
 	/**
 	 * Whether to call `.selectNone` on the Tldraw editor instance when it is mounted.
 	 */
@@ -177,6 +196,44 @@ const PENCIL_BRUSH_MIN_PX = 1
 const PENCIL_BRUSH_MAX_PX = 600
 const DEFAULT_PENCIL_BRUSH_PX = 24
 const PENCIL_SCRUB_PX_PER_SCREEN_PIXEL = 0.25
+const PENCIL_POST_SCRUB_RESUME_DISTANCE_PX = 3
+
+const ANY_WEBSITE_EMBED_DEFINITION: TLEmbedDefinition = {
+	type: 'website',
+	title: 'Website',
+	hostnames: ['*'],
+	minWidth: 280,
+	minHeight: 200,
+	width: 960,
+	height: 600,
+	doesResize: true,
+	overridePermissions: {
+		'allow-popups-to-escape-sandbox': true,
+	},
+	toEmbedUrl: (url) => {
+		try {
+			const parsed = new URL(url)
+			if (!['http:', 'https:'].includes(parsed.protocol)) return
+			return parsed.toString()
+		} catch {
+			return
+		}
+	},
+	fromEmbedUrl: (url) => {
+		try {
+			const parsed = new URL(url)
+			if (!['http:', 'https:'].includes(parsed.protocol)) return
+			return parsed.toString()
+		} catch {
+			return
+		}
+	},
+}
+
+const EMBED_DEFINITIONS: TLEmbedDefinition[] = [
+	...DEFAULT_EMBED_DEFINITIONS,
+	ANY_WEBSITE_EMBED_DEFINITION,
+]
 
 function getStrokeWidthForSize(size: TLDefaultSizeStyle): number {
 	switch (size) {
@@ -195,6 +252,53 @@ function getStrokeWidthForSize(size: TLDefaultSizeStyle): number {
 function clampBrushPx(value: number): number {
 	if (!Number.isFinite(value)) return DEFAULT_PENCIL_BRUSH_PX
 	return Math.max(PENCIL_BRUSH_MIN_PX, Math.min(PENCIL_BRUSH_MAX_PX, Math.round(value)))
+}
+
+function hashStringToUnit(value: string): number {
+	let hash = 0
+	for (let i = 0; i < value.length; i++) {
+		hash = (hash * 31 + value.charCodeAt(i)) | 0
+	}
+	return Math.abs(hash % 1000) / 1000
+}
+
+function deriveKritaPresetStyle(presetName: string, presetPath: string) {
+	const identity = `${presetName}::${presetPath}`.toLowerCase()
+	const seed = hashStringToUnit(identity)
+
+	let pencilBrushSizePx = Math.round(8 + seed * 38)
+	let pencilOpacitySensitivity = +(0.65 + seed * 2.2).toFixed(2)
+	let pencilTextureIntensity = +(0.08 + seed * 0.72).toFixed(2)
+	let pencilCrossSectionAspectRatio = +(1 + seed * 5.5).toFixed(2)
+
+	if (/(charcoal|graphite|pencil|chalk|conte|pastel)/i.test(identity)) {
+		pencilBrushSizePx = 20 + Math.round(seed * 20)
+		pencilOpacitySensitivity = +(0.9 + seed * 1.2).toFixed(2)
+		pencilTextureIntensity = +(0.45 + seed * 0.45).toFixed(2)
+		pencilCrossSectionAspectRatio = +(3.5 + seed * 3.5).toFixed(2)
+	} else if (/(ink|pen|liner|fineliner|calligraphy)/i.test(identity)) {
+		pencilBrushSizePx = 4 + Math.round(seed * 8)
+		pencilOpacitySensitivity = +(1.8 + seed * 2.1).toFixed(2)
+		pencilTextureIntensity = +(0.03 + seed * 0.2).toFixed(2)
+		pencilCrossSectionAspectRatio = +(1 + seed * 1.5).toFixed(2)
+	} else if (/(marker|felt|highlighter)/i.test(identity)) {
+		pencilBrushSizePx = 16 + Math.round(seed * 26)
+		pencilOpacitySensitivity = +(1.4 + seed * 1.1).toFixed(2)
+		pencilTextureIntensity = +(0.05 + seed * 0.2).toFixed(2)
+		pencilCrossSectionAspectRatio = +(2 + seed * 2.5).toFixed(2)
+	} else if (/(brush|paint|watercolor|gouache|acrylic|oil)/i.test(identity)) {
+		pencilBrushSizePx = 14 + Math.round(seed * 34)
+		pencilOpacitySensitivity = +(0.85 + seed * 1.7).toFixed(2)
+		pencilTextureIntensity = +(0.2 + seed * 0.55).toFixed(2)
+		pencilCrossSectionAspectRatio = +(1.4 + seed * 2.4).toFixed(2)
+	}
+
+	return {
+		pencilBrushSizePx: clampBrushPx(pencilBrushSizePx),
+		pencilOpacitySensitivity: Math.max(0, pencilOpacitySensitivity),
+		pencilTextureIntensity: Math.max(0, Math.min(1, pencilTextureIntensity)),
+		pencilCrossSectionAspectRatio: Math.max(1, Math.min(12, pencilCrossSectionAspectRatio)),
+	}
 }
 
 function getPencilBrushScale(editor: Editor, brushPx: number): number {
@@ -274,6 +378,98 @@ function PencilBrushSizeSlider() {
 	)
 }
 
+type KritaPresetOption = {
+	id: string
+	label: string
+	bundleName: string
+	path: string
+	derivedStyle?: {
+		pencilBrushSizePx: number
+		pencilOpacitySensitivity: number
+		pencilTextureIntensity: number
+		pencilCrossSectionAspectRatio: number
+		pencilTextureEnabled: boolean
+	}
+}
+
+function KritaBrushPresetPanel() {
+	const plugin = useTldrawPlugin()
+	const tools = useTools()
+	const isPencilSelected = useIsToolSelected(tools.pencil)
+	const userSettings = useUserPluginSettings(plugin.settingsManager)
+
+	const presets = React.useMemo<KritaPresetOption[]>(() => {
+		const bundles = userSettings.kritaBrushBundles ?? []
+		const options: KritaPresetOption[] = []
+
+		for (const bundle of bundles) {
+			const bundleName = bundle.name || bundle.summary?.bundleName || bundle.originalFileName || 'Krita bundle'
+			const entries = bundle.summary?.presetEntries ?? []
+			for (const entry of entries) {
+				const fileName = entry.name || entry.fullPath?.split('/').at(-1) || 'preset'
+				const label = fileName.replace(/\.kpp$/i, '')
+				options.push({
+					id: `${bundle.id}:${entry.fullPath}`,
+					label,
+					bundleName,
+					path: entry.fullPath,
+					derivedStyle: bundle.summary?.derivedPresetStyles?.[entry.fullPath],
+				})
+			}
+		}
+
+		return options
+	}, [userSettings.kritaBrushBundles])
+
+	const selectedPresetId = userSettings.handwritingRecognition?.kritaSelectedPresetId
+
+	const onSelectPreset = React.useCallback(
+		(preset: KritaPresetOption) => {
+			const derivedStyle = preset.derivedStyle ?? deriveKritaPresetStyle(preset.label, preset.path)
+			plugin.settingsManager.settings.handwritingRecognition = {
+				...(plugin.settingsManager.settings.handwritingRecognition ?? {}),
+				kritaSelectedPresetId: preset.id,
+				pencilBrushSizePx: derivedStyle.pencilBrushSizePx,
+				pencilOpacitySensitivity: derivedStyle.pencilOpacitySensitivity,
+				pencilTextureEnabled: derivedStyle.pencilTextureEnabled,
+				pencilTextureIntensity: derivedStyle.pencilTextureIntensity,
+				pencilCrossSectionAspectRatio: derivedStyle.pencilCrossSectionAspectRatio,
+			}
+			void plugin.settingsManager.updateSettings(plugin.settingsManager.settings)
+		},
+		[plugin.settingsManager]
+	)
+
+	if (!isPencilSelected) return null
+
+	return (
+		<div className="ptl-krita-brush-panel">
+			<div className="ptl-krita-brush-panel-header">Krita brushes ({presets.length})</div>
+			<div className="ptl-krita-brush-list" role="listbox" aria-label="Krita brush presets">
+				{presets.length === 0 ? (
+					<div className="ptl-krita-brush-empty">Import a Krita bundle to see presets here.</div>
+				) : (
+					presets.map((preset) => {
+						const isSelected = selectedPresetId === preset.id
+						return (
+							<button
+								key={preset.id}
+								type="button"
+								className="ptl-krita-brush-item"
+								data-selected={isSelected}
+								onClick={() => onSelectPreset(preset)}
+							>
+								<span className="ptl-krita-brush-item-name">{preset.label}</span>
+								<span className="ptl-krita-brush-item-bundle">{preset.bundleName}</span>
+							</button>
+						)
+					})
+				)}
+			</div>
+		</div>
+	)
+}
+
 function PluginStylePanel(props: TLUiStylePanelProps) {
 	const styles = useRelevantStyles()
 
@@ -285,6 +481,7 @@ function PluginStylePanel(props: TLUiStylePanelProps) {
 		<DefaultStylePanel isMobile={props.isMobile}>
 			<>
 				<PencilBrushSizeSlider />
+				<KritaBrushPresetPanel />
 				<DefaultStylePanelContent styles={styles} />
 			</>
 		</DefaultStylePanel>
@@ -347,6 +544,25 @@ type AnchorStickerOverlay = {
 	top: number
 }
 
+type PencilScrubHudState = {
+	active: boolean
+	left: number
+	top: number
+	brushPx: number
+}
+
+type UrlPasteDialogState = {
+	url: string
+	point?: VecLike
+}
+
+type YoutubeEmbedSelection = {
+	shapeId: string
+	url: string
+	playlistId?: string
+	videoId?: string
+}
+
 const DEFAULT_SEARCH_FOCUS_MIN_SIZE = 64
 const SEARCH_FOCUS_PADDING = 20
 const ANCHOR_MENTIONS_FRONTMATTER_KEY = 'tldraw-canvas-mentions'
@@ -389,6 +605,59 @@ function parseCanvasPathFromMentionToken(value: string): string | undefined {
 	}
 
 	return undefined
+}
+
+function parseYoutubeIds(url: string): { videoId?: string; playlistId?: string } {
+	try {
+		const parsed = new URL(url)
+		const host = parsed.hostname.replace(/^www\./, '').toLowerCase()
+		if (!host.includes('youtube.com') && host !== 'youtu.be' && host !== 'music.youtube.com') {
+			return {}
+		}
+
+		let videoId = parsed.searchParams.get('v') ?? undefined
+		const playlistId = parsed.searchParams.get('list') ?? undefined
+
+		if (!videoId && host === 'youtu.be') {
+			const pathPart = parsed.pathname.split('/').filter(Boolean)[0]
+			if (pathPart) videoId = pathPart
+		}
+
+		if (!videoId && parsed.pathname.startsWith('/embed/')) {
+			const pathPart = parsed.pathname.split('/').filter(Boolean)[1]
+			if (pathPart) videoId = pathPart
+		}
+
+		return { videoId, playlistId }
+	} catch {
+		return {}
+	}
+}
+
+function buildYoutubeWatchUrl(videoId: string, playlistId?: string): string {
+	const url = new URL('https://www.youtube.com/watch')
+	url.searchParams.set('v', videoId)
+	if (playlistId) {
+		url.searchParams.set('list', playlistId)
+	}
+	return url.toString()
+}
+
+function normalizeYoutubeVideoEntry(raw: string): string | undefined {
+	const trimmed = raw.trim()
+	if (!trimmed) return
+
+	if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) {
+		return buildYoutubeWatchUrl(trimmed)
+	}
+
+	const ids = parseYoutubeIds(trimmed)
+	if (!ids.videoId) return
+	return buildYoutubeWatchUrl(ids.videoId, ids.playlistId)
+}
+
+function buildPlaylistStorageKey(documentId: string, shapeId: string): string {
+	return `ptl.youtube-playlist.v1:${documentId}:${shapeId}`
 }
 
 function clampUnit(value: number): number {
@@ -474,6 +743,7 @@ const TldrawApp = ({
 		components: otherComponents,
 		focusOnMount = true,
 		hideUi = false,
+		shapeUtils = PENCIL_SHAPE_UTILS,
 		iconAssetUrls,
 		initialTool,
 		isReadonly = false,
@@ -534,9 +804,20 @@ const TldrawApp = ({
 	const [isFocused, setIsFocused] = React.useState(false)
 	const [overlayRenderTick, setOverlayRenderTick] = React.useState(0)
 	const [isSearchPanelOpen, setIsSearchPanelOpen] = React.useState(false)
+	const [isPlaylistPanelOpen, setIsPlaylistPanelOpen] = React.useState(false)
 	const [searchQuery, setSearchQuery] = React.useState('')
+	const [playlistInput, setPlaylistInput] = React.useState('')
 	const [selectedSearchResultIndex, setSelectedSearchResultIndex] = React.useState(-1)
 	const [activeSearchGroupId, setActiveSearchGroupId] = React.useState<string | undefined>(undefined)
+	const [selectedYoutubeEmbed, setSelectedYoutubeEmbed] = React.useState<YoutubeEmbedSelection | null>(null)
+	const [playlistEntriesByShapeId, setPlaylistEntriesByShapeId] = React.useState<Record<string, string[]>>({})
+	const [pencilScrubHud, setPencilScrubHud] = React.useState<PencilScrubHudState>({
+		active: false,
+		left: 0,
+		top: 0,
+		brushPx: DEFAULT_PENCIL_BRUSH_PX,
+	})
+	const [urlPasteDialog, setUrlPasteDialog] = React.useState<UrlPasteDialogState | null>(null)
 	const searchInputRef = React.useRef<HTMLInputElement>(null)
 	const searchPanelRef = React.useRef<HTMLDivElement>(null)
 	const searchResultsRef = React.useRef<HTMLDivElement>(null)
@@ -544,6 +825,12 @@ const TldrawApp = ({
 	const recognizerRef = React.useRef(createHandwritingRecognizer({ engine: 'stub' }))
 	const recognitionDebounceTimerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 	const recognitionRunVersionRef = React.useRef(0)
+	const suppressScrubArtifactUntilRef = React.useRef(0)
+	const scrubCanceledShapeIdsRef = React.useRef(new Set<string>())
+	const bootstrappedRecognitionByDocumentRef = React.useRef(new Set<string>())
+	const urlPasteDialogResolverRef = React.useRef<
+		((choice: 'iframe' | 'text' | 'cancel') => void) | null
+	>(null)
 	const handwritingDocumentId = React.useMemo(() => {
 		if (store && 'plugin' in store && store.plugin) {
 			return store.plugin.meta.uuid
@@ -588,6 +875,217 @@ const TldrawApp = ({
 		onEditorMount,
 		setFocusedEditor: (editor) => setFocusedEditor(true, editor),
 	})
+
+	const requestUrlPasteChoice = React.useCallback(
+		(url: string, point?: VecLike): Promise<'iframe' | 'text' | 'cancel'> => {
+			if (urlPasteDialogResolverRef.current) {
+				urlPasteDialogResolverRef.current('cancel')
+				urlPasteDialogResolverRef.current = null
+			}
+
+			setUrlPasteDialog({ url, point })
+
+			return new Promise((resolve) => {
+				urlPasteDialogResolverRef.current = resolve
+			})
+		},
+		[]
+	)
+
+	const resolveUrlPasteChoice = React.useCallback((choice: 'iframe' | 'text' | 'cancel') => {
+		const resolve = urlPasteDialogResolverRef.current
+		urlPasteDialogResolverRef.current = null
+		setUrlPasteDialog(null)
+		resolve?.(choice)
+	}, [])
+
+	React.useEffect(() => {
+		if (!editor) return
+
+		editor.registerExternalContentHandler('url', async (externalContent) => {
+			const { point, url } = externalContent as { point?: VecLike; url: string }
+			const trimmedUrl = url.trim()
+			let parsed: URL
+
+			try {
+				parsed = new URL(trimmedUrl)
+			} catch {
+				return editor.putExternalContent({ type: 'text', text: url, point })
+			}
+
+			if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+				return editor.putExternalContent({ type: 'text', text: parsed.toString(), point })
+			}
+
+			const choice = await requestUrlPasteChoice(parsed.toString(), point)
+			if (choice === 'cancel') return
+
+			if (choice === 'text') {
+				return editor.putExternalContent({ type: 'text', text: parsed.toString(), point })
+			}
+
+			const embedUtil = editor.getShapeUtil('embed') as
+				| { getEmbedDefinition: (url: string) => { url: string; definition: unknown } | undefined }
+				| undefined
+			const embedInfo = embedUtil?.getEmbedDefinition(parsed.toString())
+
+			if (!embedInfo) {
+				return editor.putExternalContent({ type: 'text', text: parsed.toString(), point })
+			}
+
+			await editor.putExternalContent({
+				type: 'embed',
+				url: embedInfo.url,
+				point,
+				embed: embedInfo.definition,
+			})
+
+			const activateEmbed = () => {
+				let shape = editor.getOnlySelectedShape()
+				if (!shape || shape.type !== 'embed') {
+					const matches = editor
+						.getCurrentPageShapes()
+						.filter(
+							(candidate): candidate is { id: string; type: 'embed'; props: { url: string } } =>
+								candidate.type === 'embed' && candidate.props?.url === embedInfo.url
+						)
+					shape = matches.at(-1)
+				}
+
+				if (shape?.type === 'embed') {
+					editor.setSelectedShapes([shape.id])
+					editor.setEditingShape(shape.id)
+				}
+			}
+
+			requestAnimationFrame(activateEmbed)
+			setTimeout(activateEmbed, 80)
+		})
+
+		return () => {
+			if (urlPasteDialogResolverRef.current) {
+				urlPasteDialogResolverRef.current('cancel')
+				urlPasteDialogResolverRef.current = null
+			}
+		}
+	}, [editor, requestUrlPasteChoice])
+
+	React.useEffect(() => {
+		if (!editor) return
+
+		const syncSelectedYoutubeEmbed = () => {
+			const selected = editor.getOnlySelectedShape()
+			if (!selected || selected.type !== 'embed') {
+				setSelectedYoutubeEmbed(null)
+				return
+			}
+
+			const url = typeof selected.props?.url === 'string' ? selected.props.url : ''
+			const ids = parseYoutubeIds(url)
+			if (!ids.videoId && !ids.playlistId) {
+				setSelectedYoutubeEmbed(null)
+				return
+			}
+
+			setSelectedYoutubeEmbed((current) => {
+				if (
+					current?.shapeId === selected.id &&
+					current.url === url &&
+					current.videoId === ids.videoId &&
+					current.playlistId === ids.playlistId
+				) {
+					return current
+				}
+				return {
+					shapeId: selected.id,
+					url,
+					videoId: ids.videoId,
+					playlistId: ids.playlistId,
+				}
+			})
+		}
+
+		syncSelectedYoutubeEmbed()
+		const intervalId = window.setInterval(syncSelectedYoutubeEmbed, 250)
+		return () => window.clearInterval(intervalId)
+	}, [editor])
+
+	React.useEffect(() => {
+		if (!selectedYoutubeEmbed) return
+		if (playlistEntriesByShapeId[selectedYoutubeEmbed.shapeId]) return
+
+		const storageKey = buildPlaylistStorageKey(handwritingDocumentId, selectedYoutubeEmbed.shapeId)
+		let nextEntries: string[] = []
+		try {
+			const raw = window.localStorage.getItem(storageKey)
+			if (raw) {
+				const parsed = JSON.parse(raw)
+				if (Array.isArray(parsed)) {
+					nextEntries = parsed.filter((entry): entry is string => typeof entry === 'string')
+				}
+			}
+		} catch {
+			nextEntries = []
+		}
+
+		if (nextEntries.length === 0 && selectedYoutubeEmbed.videoId) {
+			nextEntries = [buildYoutubeWatchUrl(selectedYoutubeEmbed.videoId, selectedYoutubeEmbed.playlistId)]
+		}
+
+		setPlaylistEntriesByShapeId((current) => ({
+			...current,
+			[selectedYoutubeEmbed.shapeId]: nextEntries,
+		}))
+	}, [handwritingDocumentId, playlistEntriesByShapeId, selectedYoutubeEmbed])
+
+	const updateYoutubeEmbedVideo = React.useCallback(
+		(videoUrl: string) => {
+			if (!editor || !selectedYoutubeEmbed) return
+			const nextIds = parseYoutubeIds(videoUrl)
+			if (!nextIds.videoId) return
+
+			const playlistId = nextIds.playlistId ?? selectedYoutubeEmbed.playlistId
+			const nextUrl = buildYoutubeWatchUrl(nextIds.videoId, playlistId)
+
+			editor.updateShapes([
+				{
+					id: selectedYoutubeEmbed.shapeId,
+					type: 'embed',
+					props: {
+						url: nextUrl,
+					},
+				},
+			])
+
+			editor.setSelectedShapes([selectedYoutubeEmbed.shapeId])
+			editor.setEditingShape(selectedYoutubeEmbed.shapeId)
+		},
+		[editor, selectedYoutubeEmbed]
+	)
+
+	const loadPlaylistFromInput = React.useCallback(() => {
+		if (!selectedYoutubeEmbed) return
+
+		const lines = playlistInput
+			.split(/\r?\n/)
+			.map((line) => normalizeYoutubeVideoEntry(line))
+			.filter((entry): entry is string => !!entry)
+
+		if (lines.length === 0) return
+
+		const unique = Array.from(new Set(lines))
+		const storageKey = buildPlaylistStorageKey(handwritingDocumentId, selectedYoutubeEmbed.shapeId)
+		window.localStorage.setItem(storageKey, JSON.stringify(unique))
+
+		setPlaylistEntriesByShapeId((current) => ({
+			...current,
+			[selectedYoutubeEmbed.shapeId]: unique,
+		}))
+
+		if (unique[0]) {
+			updateYoutubeEmbedVideo(unique[0])
+		}
+	}, [handwritingDocumentId, playlistInput, selectedYoutubeEmbed, updateYoutubeEmbedVideo])
 
 	const onnxModelConfig = React.useMemo(() => {
 		return resolveOnlineHtrModelConfig(userSettings.handwritingRecognition)
@@ -639,6 +1137,74 @@ const TldrawApp = ({
 		if (typeof configured !== 'number' || !Number.isFinite(configured)) return 2.5
 		return Math.max(0.5, Math.min(5, configured))
 	}, [userSettings.handwritingRecognition?.pressureSensitivity])
+
+	const pencilOpacitySensitivity = React.useMemo(() => {
+		const configured = userSettings.handwritingRecognition?.pencilOpacitySensitivity
+		if (typeof configured !== 'number' || !Number.isFinite(configured)) return 1
+		return Math.max(0, configured)
+	}, [userSettings.handwritingRecognition?.pencilOpacitySensitivity])
+
+	const pencilCrossSectionAspectRatio = React.useMemo(() => {
+		const configured = userSettings.handwritingRecognition?.pencilCrossSectionAspectRatio
+		if (typeof configured !== 'number' || !Number.isFinite(configured)) return 5
+		return Math.max(1, Math.min(12, configured))
+	}, [userSettings.handwritingRecognition?.pencilCrossSectionAspectRatio])
+
+	React.useEffect(() => {
+		setPencilOpacitySensitivity(pencilOpacitySensitivity)
+	}, [pencilOpacitySensitivity])
+
+	React.useEffect(() => {
+		setPencilCrossSectionAspectRatio(pencilCrossSectionAspectRatio)
+	}, [pencilCrossSectionAspectRatio])
+
+	const pencilDefaultStrokeEnabled = userSettings.debugLogs?.pencilDefaultStroke ?? true
+	const pencilBaseStrokeEnabled = userSettings.debugLogs?.pencilBaseStroke ?? true
+	const pencilSampledOverlayEnabled = userSettings.debugLogs?.pencilSampledOverlay ?? true
+	const pencilFallbackStylingEnabled = userSettings.debugLogs?.pencilFallbackStyling ?? true
+
+	// Force tldraw to invalidate render cache when renderer settings change
+	const invalidateDrawShapeCache = React.useCallback(() => {
+		if (!editor) return
+		try {
+			if (typeof editor.getCurrentPageShapes !== 'function') return
+			const allShapes = editor.getCurrentPageShapes().filter((s) => s.type === 'draw')
+			if (allShapes.length === 0) return
+
+			// Dummy update: set x to itself to trigger cache invalidation.
+			editor.updateShapes(
+				allShapes.map((shape) => ({
+					id: shape.id,
+					type: shape.type,
+					x: shape.x,
+				}))
+			)
+		} catch (error) {
+			console.warn('[TldrawApp] cache invalidation skipped', error)
+		}
+	}, [editor])
+
+	React.useEffect(() => {
+		setPencilDefaultStrokeEnabled(pencilDefaultStrokeEnabled)
+		setPencilBaseStrokeEnabled(pencilBaseStrokeEnabled)
+		setPencilSampledOverlayEnabled(pencilSampledOverlayEnabled)
+		setPencilFallbackStylingEnabled(pencilFallbackStylingEnabled)
+		// Apply all renderer toggles first, then invalidate once.
+		console.log('[TldrawApp] Pencil renderer toggles updated', {
+			pencilDefaultStrokeEnabled,
+			pencilBaseStrokeEnabled,
+			pencilSampledOverlayEnabled,
+			pencilFallbackStylingEnabled,
+		})
+		console.log('[TldrawApp] Pencil fallback styling toggled:', pencilFallbackStylingEnabled)
+		invalidateDrawShapeCache()
+	}, [
+		pencilBaseStrokeEnabled,
+		pencilDefaultStrokeEnabled,
+		pencilFallbackStylingEnabled,
+		pencilSampledOverlayEnabled,
+		invalidateDrawShapeCache,
+	])
 
 	const googleBatchPolicy = React.useMemo(() => {
 		const source = userSettings.handwritingRecognition
@@ -740,7 +1306,7 @@ const TldrawApp = ({
 		})
 		recognitionRunVersionRef.current += 1
 
-		if (userSettings.debugMode) {
+		if (userSettings.debugMode && userSettings.debugLogs?.recognitionEngine) {
 			console.log('[handwriting] recognizer engine selected', {
 				documentId: handwritingDocumentId,
 				backendPreference: userSettings.handwritingRecognition?.backend ?? 'auto',
@@ -894,9 +1460,15 @@ const TldrawApp = ({
 							handwritingDocumentId,
 							fingerprint
 						)
+						const nowMs = Date.now()
+						const matchedResult =
+							existing?.fingerprint === fingerprint ? existing : existingByFingerprint
+						const isFreshPending =
+							matchedResult?.status === 'pending' && nowMs - matchedResult.updatedAt < 15_000
 						if (
-							(existing?.fingerprint === fingerprint && existing.status === 'success') ||
-							existingByFingerprint?.status === 'success'
+							matchedResult?.status === 'success' ||
+							matchedResult?.status === 'error' ||
+							isFreshPending
 						) {
 							continue
 						}
@@ -915,7 +1487,7 @@ const TldrawApp = ({
 						try {
 							const recognitionCandidates = await recognizerRef.current.recognize(candidate)
 							if (runVersion !== recognitionRunVersionRef.current) {
-								if (userSettings.debugMode) {
+								if (userSettings.debugMode && userSettings.debugLogs?.recognitionEvents) {
 									console.log('[handwriting] stale recognition result skipped', {
 										documentId: handwritingDocumentId,
 										groupId: candidate.id,
@@ -935,7 +1507,7 @@ const TldrawApp = ({
 							})
 							setOverlayRenderTick((tick) => tick + 1)
 
-							if (userSettings.debugMode) {
+							if (userSettings.debugMode && userSettings.debugLogs?.recognitionEvents) {
 								console.log('[handwriting] recognition success', {
 									documentId: handwritingDocumentId,
 									groupId: candidate.id,
@@ -959,7 +1531,7 @@ const TldrawApp = ({
 							}
 							recognizedCount += 1
 						} catch (error) {
-							if (userSettings.debugMode) {
+							if (userSettings.debugMode && userSettings.debugLogs?.recognitionEvents) {
 								console.error('[handwriting] recognition failed', {
 									documentId: handwritingDocumentId,
 									groupId: candidate.id,
@@ -981,7 +1553,7 @@ const TldrawApp = ({
 						}
 					}
 
-					if (userSettings.debugMode) {
+					if (userSettings.debugMode && userSettings.debugLogs?.recognitionEvents) {
 						const recognizedPreview = getDocumentRecognitionResults(handwritingDocumentId)
 							.filter((result) => result.status === 'success')
 							.map((result) => ({
@@ -1011,7 +1583,7 @@ const TldrawApp = ({
 							scheduleRecognition(candidates, options)
 						}, retryDelayMs)
 
-						if (userSettings.debugMode) {
+						if (userSettings.debugMode && userSettings.debugLogs?.recognitionEvents) {
 							console.log('[handwriting] recognition deferred for fresh groups', {
 								documentId: handwritingDocumentId,
 								deferredCandidates: deferredCount,
@@ -1031,6 +1603,95 @@ const TldrawApp = ({
 			userSettings.debugMode,
 		]
 	)
+
+	React.useEffect(() => {
+		if (!editor) return
+		if (bootstrappedRecognitionByDocumentRef.current.has(handwritingDocumentId)) return
+
+		const currentDrawShapes = editor
+			.getCurrentPageShapes()
+			.filter(
+				(shape): shape is CompletedDrawShape =>
+					shape.type === 'draw' &&
+					(shape as { props?: { isComplete?: boolean } }).props?.isComplete === true
+			)
+
+		const drawShapeIds = new Set(currentDrawShapes.map((shape) => shape.id))
+		const existingPayloads = getAllNormalizedStrokePayloads(handwritingDocumentId)
+		for (const payload of existingPayloads) {
+			if (!drawShapeIds.has(payload.shapeId)) {
+				removeNormalizedStrokePayload(handwritingDocumentId, payload.shapeId)
+			}
+		}
+
+		for (const result of getDocumentRecognitionResults(handwritingDocumentId)) {
+			const hasMissingShape = result.shapeIds.some((shapeId) => !drawShapeIds.has(shapeId))
+			if (hasMissingShape) {
+				removeRecognitionResult(handwritingDocumentId, result.groupId)
+			}
+		}
+
+		let regeneratedPayloads = 0
+		for (const shape of currentDrawShapes) {
+			if (getNormalizedStrokePayload(handwritingDocumentId, shape.id)) continue
+			const strokes = extractStroke(shape)
+			if (strokes.length === 0) continue
+
+			const payload = processExtractedStroke({
+				shapeId: shape.id,
+				shape,
+				strokes,
+			})
+			if (!payload) continue
+
+			upsertNormalizedStrokePayload(handwritingDocumentId, payload)
+			regeneratedPayloads += 1
+		}
+
+		const payloads = getAllNormalizedStrokePayloads(handwritingDocumentId)
+		const attemptedShapeIds = new Set(
+			getDocumentRecognitionResults(handwritingDocumentId)
+				.filter((result) => result.status === 'success' || result.status === 'error' || result.status === 'pending')
+				.flatMap((result) => result.shapeIds)
+		)
+		const unattemptedPayloads = payloads.filter((payload) => !attemptedShapeIds.has(payload.shapeId))
+		const spatialGroups = groupNormalizedStrokePayloadsBySpatialProximity(unattemptedPayloads)
+		const autoGoogleMode =
+			!userSettings.handwritingRecognition?.manualPredictButton && recognizerEngine === 'google-ime-js'
+		const backfillCandidates = autoGoogleMode
+			? buildBatchedStrokeCandidates(
+					spatialGroups,
+					googleBatchPolicy,
+					`google-backfill-${handwritingDocumentId}`
+			  )
+			: spatialGroups
+
+		setDocumentWordCandidates(handwritingDocumentId, backfillCandidates)
+		scheduleRecognition(backfillCandidates, { immediate: true })
+		setOverlayRenderTick((tick) => tick + 1)
+		bootstrappedRecognitionByDocumentRef.current.add(handwritingDocumentId)
+
+		if (userSettings.debugMode) {
+			console.log('[handwriting] reload backfill complete', {
+				documentId: handwritingDocumentId,
+				drawShapes: currentDrawShapes.length,
+				payloadsHydrated: payloads.length,
+				unattemptedPayloads: unattemptedPayloads.length,
+				payloadsRegenerated: regeneratedPayloads,
+				spatialGroups: spatialGroups.length,
+				backfillCandidates: backfillCandidates.length,
+				autoGoogleMode,
+			})
+		}
+	}, [
+		editor,
+		googleBatchPolicy,
+		handwritingDocumentId,
+		recognizerEngine,
+		scheduleRecognition,
+		userSettings.debugMode,
+		userSettings.handwritingRecognition?.manualPredictButton,
+	])
 
 	React.useEffect(() => {
 		if (!editor) return
@@ -1059,6 +1720,7 @@ const TldrawApp = ({
 		type PencilDrawingStateLike = {
 			onEnter?: (info: PointerInfoLike) => void
 			updateDrawingShape?: () => void
+			onPointerUp?: () => void
 			onExit?: () => void
 			initialShape?: {
 				id: string
@@ -1077,10 +1739,13 @@ const TldrawApp = ({
 
 		const originalOnEnter = drawingState.onEnter?.bind(drawingState)
 		const originalUpdateDrawingShape = drawingState.updateDrawingShape.bind(drawingState)
+		const originalOnPointerUp = drawingState.onPointerUp?.bind(drawingState)
 		const originalOnExit = drawingState.onExit?.bind(drawingState)
 
 		const scrubState = {
 			active: false,
+			suppressDrawingStart: false,
+			cancelCurrentStrokeOnExit: false,
 			anchorX: 0,
 			startBrushPx: clampBrushPx(
 				userSettings.handwritingRecognition?.pencilBrushSizePx ?? DEFAULT_PENCIL_BRUSH_PX
@@ -1102,7 +1767,30 @@ const TldrawApp = ({
 		const maybeFinishScrub = () => {
 			if (!scrubState.active) return
 			scrubState.active = false
+			scrubState.suppressDrawingStart = false
+			suppressScrubArtifactUntilRef.current = Date.now() + 300
+			setPencilScrubHud((prev) => ({ ...prev, active: false }))
 			persistBrushPx(scrubState.brushPx)
+		}
+
+		const applyActiveBrushScale = () => {
+			const brushPx = scrubState.active
+				? scrubState.brushPx
+				: clampBrushPx(userSettings.handwritingRecognition?.pencilBrushSizePx ?? DEFAULT_PENCIL_BRUSH_PX)
+			const scale = getPencilBrushScale(editor, brushPx)
+			const activeShape = drawingState.initialShape
+			if (activeShape?.id && activeShape.type === 'draw') {
+				editor.updateShapes([
+					{
+						id: activeShape.id,
+						type: 'draw',
+						props: {
+							...activeShape.props,
+							scale,
+						},
+					},
+				])
+			}
 		}
 
 		drawingState.onEnter = (info: PointerInfoLike) => {
@@ -1110,6 +1798,44 @@ const TldrawApp = ({
 			const point = info?.point
 			if (!point || typeof point.z !== 'number') {
 				originalOnEnter(info)
+				const activeShapeId = drawingState.initialShape?.id
+				if (activeShapeId && drawingState.initialShape?.type === 'draw') {
+					const rawPressure = clampUnit(typeof point?.z === 'number' ? point.z : 0)
+					pressureStore.createPendingSession(activeShapeId, {
+						x: typeof point?.x === 'number' ? point.x : 0,
+						y: typeof point?.y === 'number' ? point.y : 0,
+						pressure: rawPressure,
+						velocityMagnitude: 0,
+					})
+					editor.updateShapes([
+						{
+							id: activeShapeId,
+							type: 'draw',
+							props: {
+								...drawingState.initialShape.props,
+								isPen: false,
+							},
+						},
+					])
+				}
+				applyActiveBrushScale()
+				return
+			}
+
+			const isStylusContact = point.z > 0
+			if (editor.inputs.altKey && isStylusContact) {
+				scrubState.active = true
+				scrubState.suppressDrawingStart = true
+				scrubState.anchorX = typeof point.x === 'number' ? point.x : 0
+				scrubState.startBrushPx = scrubState.brushPx
+				if (userSettings.debugMode) {
+					console.log('[pencil-scrub] onEnter alt+stylus', {
+						documentId: handwritingDocumentId,
+						x: point.x,
+						y: point.y,
+						pressure: point.z,
+					})
+				}
 				return
 			}
 
@@ -1128,71 +1854,143 @@ const TldrawApp = ({
 				},
 			}
 			originalOnEnter(adjustedInfo)
-
-			const brushPx = clampBrushPx(
-				userSettings.handwritingRecognition?.pencilBrushSizePx ?? DEFAULT_PENCIL_BRUSH_PX
-			)
-			const scale = getPencilBrushScale(editor, brushPx)
-			const activeShape = drawingState.initialShape
-			if (activeShape?.id && activeShape.type === 'draw') {
+			const activeShapeId = drawingState.initialShape?.id
+			if (activeShapeId && drawingState.initialShape?.type === 'draw') {
+				pressureStore.createPendingSession(activeShapeId, {
+					x: typeof point.x === 'number' ? point.x : 0,
+					y: typeof point.y === 'number' ? point.y : 0,
+					pressure: typeof point.z === 'number' ? point.z : 0,
+					velocityMagnitude: 0,
+				})
 				editor.updateShapes([
 					{
-						id: activeShape.id,
+						id: activeShapeId,
 						type: 'draw',
 						props: {
-							...activeShape.props,
-							scale,
+							...drawingState.initialShape.props,
+							isPen: false,
 						},
 					},
 				])
 			}
+			applyActiveBrushScale()
 		}
 
 		drawingState.updateDrawingShape = () => {
 			const currentPoint = editor.inputs.currentPagePoint as { x: number; y: number; z?: number }
 			const isStylusContact = typeof currentPoint?.z === 'number' && currentPoint.z > 0
+			const point = editor.inputs.currentPagePoint as { x?: number; y?: number; z?: number }
 
-			// Handle Alt+stylus scrubbing for brush size
 			const wasActive = scrubState.active
 			if (editor.inputs.altKey && isStylusContact) {
 				if (!scrubState.active) {
 					scrubState.active = true
+					scrubState.suppressDrawingStart = !drawingState.initialShape?.id
 					scrubState.anchorX = currentPoint.x
 					scrubState.startBrushPx = scrubState.brushPx
+					if (userSettings.debugMode) {
+						console.log('[pencil-scrub] begin scrub', {
+							documentId: handwritingDocumentId,
+							shapeId: drawingState.initialShape?.id,
+							x: currentPoint.x,
+							y: currentPoint.y,
+							brushPx: scrubState.brushPx,
+						})
+					}
+				}
+
+				const activeShapeId = drawingState.initialShape?.id
+				if (activeShapeId && drawingState.initialShape?.type === 'draw') {
+					const rawPressure = clampUnit(typeof currentPoint.z === 'number' ? currentPoint.z : 0)
+					pressureStore.createPendingSession(activeShapeId, {
+						x: currentPoint.x,
+						y: currentPoint.y,
+						pressure: rawPressure,
+						velocityMagnitude: 0,
+					})
+					editor.updateShapes([
+						{
+							id: activeShapeId,
+							type: 'draw',
+							props: {
+								...drawingState.initialShape.props,
+								isPen: false,
+							},
+						},
+					])
 				}
 
 				const dx = currentPoint.x - scrubState.anchorX
 				scrubState.brushPx = clampBrushPx(
 					scrubState.startBrushPx + dx * PENCIL_SCRUB_PX_PER_SCREEN_PIXEL
 				)
-			} else {
-				maybeFinishScrub()
+				const scrubHudPoint = editor.pageToViewport({ x: currentPoint.x, y: currentPoint.y })
+				setPencilScrubHud({
+					active: true,
+					left: scrubHudPoint.x,
+					top: scrubHudPoint.y,
+					brushPx: scrubState.brushPx,
+				})
+				applyActiveBrushScale()
+
+				if (scrubState.suppressDrawingStart) {
+					return
+				}
+
+				if (point && typeof point.z === 'number') {
+					const originalZDuringScrub = point.z
+					point.z = 0
+					try {
+						originalUpdateDrawingShape()
+					} finally {
+						point.z = originalZDuringScrub
+					}
+					return
+				}
+
+				return
 			}
 
-			// Only update shape scale if we're scrubbing (to avoid interfering with normal draw)
-			if (scrubState.active || wasActive !== scrubState.active) {
-				const brushPx = scrubState.active
-					? scrubState.brushPx
-					: clampBrushPx(userSettings.handwritingRecognition?.pencilBrushSizePx ?? DEFAULT_PENCIL_BRUSH_PX)
-				const scale = getPencilBrushScale(editor, brushPx)
-				const activeShape = drawingState.initialShape
-				if (activeShape?.id && activeShape.type === 'draw') {
-					editor.updateShapes([
-						{
-							id: activeShape.id,
-							type: 'draw',
-							props: {
-								...activeShape.props,
-								scale,
-							},
-						},
-					])
+			if (wasActive) {
+				scrubState.cancelCurrentStrokeOnExit = true
+				if (userSettings.debugMode) {
+					console.log('[pencil-scrub] leaving scrub state', {
+						documentId: handwritingDocumentId,
+						shapeId: drawingState.initialShape?.id,
+						isStylusContact,
+						altKey: editor.inputs.altKey,
+					})
 				}
 			}
 
-			// Apply pressure texture and coordinate jitter, then call original draw logic.
-			const point = editor.inputs.currentPagePoint as { x?: number; y?: number; z?: number }
+			maybeFinishScrub()
+
+			if (wasActive) {
+				const activeShapeId = drawingState.initialShape?.id
+				if (activeShapeId) {
+					scrubCanceledShapeIdsRef.current.add(activeShapeId)
+				}
+			}
+
+			if (scrubState.cancelCurrentStrokeOnExit) {
+				return
+			}
+
+			if (scrubState.active || wasActive !== scrubState.active) {
+				applyActiveBrushScale()
+			}
+
 			if (!point || typeof point.z !== 'number') {
+					const activeShapeId = drawingState.initialShape?.id
+					if (activeShapeId && drawingState.initialShape?.type === 'draw') {
+						pressureStore.appendPendingSessionPoint(activeShapeId, {
+							x: typeof currentPoint.x === 'number' ? currentPoint.x : 0,
+							y: typeof currentPoint.y === 'number' ? currentPoint.y : 0,
+							pressure: 0.5,
+							velocityMagnitude: 0,
+						})
+					}
+				setPencilScrubHud((prev) => ({ ...prev, active: false }))
 				originalUpdateDrawingShape()
 				return
 			}
@@ -1200,26 +1998,25 @@ const TldrawApp = ({
 			const originalX = point.x
 			const originalY = point.y
 			const originalZ = point.z
+			const rawPressure = clampUnit(typeof point.z === 'number' ? point.z : 0)
+			const adjustedPressure = applyPressureSensitivity(rawPressure, pressureSensitivity)
 			const baseX = typeof point.x === 'number' ? point.x : currentPoint.x
 			const baseY = typeof point.y === 'number' ? point.y : currentPoint.y
-			const { dx, dy } = getPencilTextureOffset(
-				textureEnabled,
-				textureIntensity,
-				baseX,
-				baseY
-			)
+			const { dx, dy } = getPencilTextureOffset(textureEnabled, textureIntensity, baseX, baseY)
 			point.x = baseX + dx
 			point.y = baseY + dy
-			point.z = applyPencilTexturePressure(
-				point.z,
-				pressureSensitivity,
-				textureEnabled,
-				textureIntensity,
-				baseX,
-				baseY
-			)
+			point.z = adjustedPressure
 			try {
 				originalUpdateDrawingShape()
+				const activeShapeId = drawingState.initialShape?.id
+				if (activeShapeId && !scrubState.active) {
+					pressureStore.appendPendingSessionPoint(activeShapeId, {
+						x: baseX,
+						y: baseY,
+						pressure: rawPressure,
+						velocityMagnitude: Math.hypot(baseX - originalX, baseY - originalY),
+					})
+				}
 			} finally {
 				point.x = originalX
 				point.y = originalY
@@ -1227,18 +2024,71 @@ const TldrawApp = ({
 			}
 		}
 
+		drawingState.onPointerUp = () => {
+			if (scrubState.active || scrubState.cancelCurrentStrokeOnExit) {
+				const activeShapeId = drawingState.initialShape?.id
+				if (userSettings.debugMode) {
+					console.log('[pencil-scrub] onPointerUp cancel', {
+						documentId: handwritingDocumentId,
+						active: scrubState.active,
+						cancelCurrentStrokeOnExit: scrubState.cancelCurrentStrokeOnExit,
+						activeShapeId,
+					})
+				}
+				if (activeShapeId) {
+					scrubCanceledShapeIdsRef.current.add(activeShapeId)
+					suppressScrubArtifactUntilRef.current = Date.now() + 500
+					pressureStore.cancelPendingSession(activeShapeId)
+					if (editor.getShape(activeShapeId)) {
+						editor.deleteShapes([activeShapeId])
+					}
+				}
+				scrubState.cancelCurrentStrokeOnExit = false
+				maybeFinishScrub()
+				setPencilScrubHud((prev) => ({ ...prev, active: false }))
+				drawingState.parent.transition('idle')
+				return
+			}
+
+			originalOnPointerUp?.()
+		}
+
 		drawingState.onExit = () => {
+			const activeShapeId = drawingState.initialShape?.id
+			if (userSettings.debugMode) {
+				console.log('[pencil-scrub] onExit', {
+					documentId: handwritingDocumentId,
+					cancelCurrentStrokeOnExit: scrubState.cancelCurrentStrokeOnExit,
+					activeShapeId,
+				})
+			}
+			if (scrubState.cancelCurrentStrokeOnExit && activeShapeId) {
+				scrubCanceledShapeIdsRef.current.add(activeShapeId)
+				suppressScrubArtifactUntilRef.current = Date.now() + 500
+				pressureStore.cancelPendingSession(activeShapeId)
+				if (editor.getShape(activeShapeId)) {
+					editor.deleteShapes([activeShapeId])
+				}
+			}
+			scrubState.cancelCurrentStrokeOnExit = false
 			maybeFinishScrub()
+			if (activeShapeId) {
+				pressureStore.endPendingSession(activeShapeId)
+			}
+			setPencilScrubHud((prev) => ({ ...prev, active: false }))
 			originalOnExit?.()
 		}
 
 		return () => {
 			maybeFinishScrub()
+			setPencilScrubHud((prev) => ({ ...prev, active: false }))
 			if (originalOnEnter) {
 				drawingState.onEnter = originalOnEnter
 			}
 			drawingState.updateDrawingShape = originalUpdateDrawingShape
+			drawingState.onPointerUp = originalOnPointerUp
 			drawingState.onExit = originalOnExit
+				shapeUtils={shapeUtils}
 		}
 	}, [
 		editor,
@@ -1527,18 +2377,199 @@ const TldrawApp = ({
 		scheduleRecognition(groupedCandidates, { immediate: true })
 	}, [handwritingDocumentId, scheduleRecognition, userSettings.debugMode])
 
+	const setSelectedShapesOpacityToHalf = React.useCallback(() => {
+		if (!editor) return
+
+		const selectedShapeIds = Array.from(editor.getSelectedShapeIds())
+		if (selectedShapeIds.length === 0) {
+			new Notice('Select at least one shape to set opacity to 50%.')
+			return
+		}
+
+		const updates = selectedShapeIds
+			.map((shapeId) => {
+				const shape = editor.getShape(shapeId)
+				if (!shape) return null
+				return {
+					id: shape.id,
+					type: shape.type,
+					opacity: 0.5,
+				}
+			})
+			.filter((update): update is NonNullable<typeof update> => update !== null)
+
+		if (updates.length === 0) {
+			new Notice('Could not resolve selected shapes for opacity update.')
+			return
+		}
+
+		editor.updateShapes(updates as never)
+		new Notice(`Set opacity to 50% for ${updates.length} shape(s).`)
+
+		if (userSettings.debugMode) {
+			console.log('[debug-opacity] applied 50% opacity', {
+				documentId: handwritingDocumentId,
+				shapeIds: updates.map((update) => update.id),
+				updatedCount: updates.length,
+			})
+		}
+	}, [editor, handwritingDocumentId, userSettings.debugMode])
+
 	const onStrokeExtracted = React.useCallback(
 		(result: StrokeExtractionResult) => {
+			if (scrubCanceledShapeIdsRef.current.has(result.shapeId)) {
+				scrubCanceledShapeIdsRef.current.delete(result.shapeId)
+				pressureStore.removePressureData(result.shapeId)
+				if (userSettings.debugMode) {
+					console.log('[pencil] ignored stroke after Alt-release scrub cancel', {
+						documentId: handwritingDocumentId,
+						shapeId: result.shapeId,
+						totalPoints: result.strokes.reduce((count, segment) => count + segment.length, 0),
+					})
+				}
+				return
+			}
+
+			const totalPoints = result.strokes.reduce((count, segment) => count + segment.length, 0)
+			let minX = Number.POSITIVE_INFINITY
+			let minY = Number.POSITIVE_INFINITY
+			let maxX = Number.NEGATIVE_INFINITY
+			let maxY = Number.NEGATIVE_INFINITY
+			let polylineLength = 0
+
+			for (const segment of result.strokes) {
+				for (let i = 0; i < segment.length; i++) {
+					const point = segment[i]
+					minX = Math.min(minX, point.x)
+					minY = Math.min(minY, point.y)
+					maxX = Math.max(maxX, point.x)
+					maxY = Math.max(maxY, point.y)
+					if (i > 0) {
+						const prev = segment[i - 1]
+						const dx = point.x - prev.x
+						const dy = point.y - prev.y
+						polylineLength += Math.sqrt(dx * dx + dy * dy)
+					}
+				}
+			}
+
+			const width = Number.isFinite(minX) && Number.isFinite(maxX) ? maxX - minX : 0
+			const height = Number.isFinite(minY) && Number.isFinite(maxY) ? maxY - minY : 0
+			const tinyStroke = totalPoints <= 3 || (width < 3 && height < 3) || polylineLength < 4
+
+			if (Date.now() <= suppressScrubArtifactUntilRef.current && tinyStroke) {
+				editor?.deleteShapes([result.shapeId])
+				if (userSettings.debugMode) {
+					console.log('[pencil] dropped post-scrub artifact stroke', {
+						documentId: handwritingDocumentId,
+						shapeId: result.shapeId,
+						totalPoints,
+						width,
+						height,
+						polylineLength,
+					})
+				}
+				return
+			}
+
 			const rawPointsCount = result.strokes.reduce((count, segment) => count + segment.length, 0)
-			const pressureData = pressureStore.consumePendingSessionForStroke(result.shapeId, rawPointsCount)
+			let pressureData = pressureStore.consumePendingSessionForStroke(result.shapeId, rawPointsCount)
+			if (!pressureData && rawPointsCount > 0) {
+				const syntheticPoints = result.strokes.flatMap((segment) =>
+					segment.map((point) => ({
+						x: point.x,
+						y: point.y,
+						pressure: 0.5,
+						velocityMagnitude: 0.25,
+					}))
+				)
+				pressureData = {
+					points: syntheticPoints,
+					timestamp: Date.now(),
+				}
+				pressureStore.setPressureData(result.shapeId, pressureData)
+			}
 
 			if (userSettings.debugMode && pressureData) {
+				const pressures = pressureData.points.map((point) => point.pressure)
+				const mappedOpacities = pressures.map((pressure) => getPressureOpacityStyle(pressure))
+				const minPressure = pressures.length ? Math.min(...pressures) : 0
+				const maxPressure = pressures.length ? Math.max(...pressures) : 0
+				const meanPressure = pressures.length
+					? pressures.reduce((sum, pressure) => sum + pressure, 0) / pressures.length
+					: 0
+				const minOpacity = mappedOpacities.length ? Math.min(...mappedOpacities) : 0
+				const maxOpacity = mappedOpacities.length ? Math.max(...mappedOpacities) : 0
+				const meanOpacity = mappedOpacities.length
+					? mappedOpacities.reduce((sum, opacity) => sum + opacity, 0) / mappedOpacities.length
+					: 0
+				const opacityBuckets = [0, 0, 0, 0, 0]
+				for (const opacity of mappedOpacities) {
+					const bucketIndex = Math.max(0, Math.min(opacityBuckets.length - 1, Math.floor(opacity * opacityBuckets.length)))
+					opacityBuckets[bucketIndex] += 1
+				}
+
 				console.log('[pencil] mapped pressure session to shape', {
 					documentId: handwritingDocumentId,
 					shapeId: result.shapeId,
 					rawPointsCount,
 					pressurePointsCount: pressureData.points.length,
+					pressureMin: Number(minPressure.toFixed(3)),
+					pressureMax: Number(maxPressure.toFixed(3)),
+					pressureMean: Number(meanPressure.toFixed(3)),
+					opacityMin: Number(minOpacity.toFixed(3)),
+					opacityMax: Number(maxOpacity.toFixed(3)),
+					opacityMean: Number(meanOpacity.toFixed(3)),
+					opacityBuckets,
+					opacityBucketsCsv: opacityBuckets.join(','),
 				})
+			}
+
+			if (editor && userSettings.debugMode) {
+				const shape = editor.getShape(result.shapeId)
+				console.log('[pencil] pressure shape ready for gradient render', {
+					documentId: handwritingDocumentId,
+					shapeId: result.shapeId,
+					topLevelOpacity: shape?.opacity,
+					pointCount: pressureData?.points.length ?? 0,
+					pencilOpacitySensitivity,
+				})
+			}
+
+			if (userSettings.debugMode) {
+				const shape = editor.getShape(result.shapeId)
+				if (shape?.type === 'draw') {
+					const segmentPoints = shape.props.segments.flatMap((segment) => segment.points)
+					const zValues = segmentPoints
+						.map((point) => (typeof point.z === 'number' ? point.z : null))
+						.filter((value): value is number => value !== null)
+					const minZ = zValues.length ? Math.min(...zValues) : 0
+					const maxZ = zValues.length ? Math.max(...zValues) : 0
+					const meanZ = zValues.length
+						? zValues.reduce((sum, value) => sum + value, 0) / zValues.length
+						: 0
+					const zBuckets = [0, 0, 0, 0, 0]
+					for (const value of zValues) {
+						const bucketIndex = Math.max(
+							0,
+							Math.min(zBuckets.length - 1, Math.floor(value * zBuckets.length))
+						)
+						zBuckets[bucketIndex] += 1
+					}
+
+					console.log('[pencil] persisted draw shape pressure stats', {
+						documentId: handwritingDocumentId,
+						shapeId: result.shapeId,
+						topLevelOpacity: shape.opacity,
+						segmentCount: shape.props.segments.length,
+						pointCount: segmentPoints.length,
+						zMin: Number(minZ.toFixed(3)),
+						zMax: Number(maxZ.toFixed(3)),
+						zMean: Number(meanZ.toFixed(3)),
+						zBuckets,
+						zBucketsCsv: zBuckets.join(','),
+					})
+				}
 			}
 
 			const payload = processExtractedStroke(result)
@@ -1588,6 +2619,7 @@ const TldrawApp = ({
 			}
 		},
 		[
+			editor,
 			buildRecognitionCandidates,
 			handwritingDocumentId,
 			scheduleRecognition,
@@ -2215,7 +3247,10 @@ const TldrawApp = ({
 
 	return (
 		<div
-			className={`tldraw-view-root${userSettings.darkModeInvert ? ' ptl-dark-mode-invert' : ''}`}
+			className={`tldraw-view-root${userSettings.darkModeInvert ? ' ptl-dark-mode-invert' : ''}${
+				pencilScrubHud.active ? ' ptl-pencil-scrubbing' : ''
+			}`}
+			style={pencilScrubHud.active ? { cursor: 'col-resize' } : undefined}
 			// e.stopPropagation(); this line should solve the mobile swipe menus bug
 			// The bug only happens on the mobile version of Obsidian.
 			// When a user tries to interact with the tldraw canvas,
@@ -2335,9 +3370,150 @@ const TldrawApp = ({
 					Predict now
 				</button>
 			) : null}
+			{selectedYoutubeEmbed ? (
+				<button
+					type="button"
+					className="ptl-handwriting-predict-button"
+					style={{ top: userSettings.handwritingRecognition?.manualPredictButton ? '48px' : '12px' }}
+					onClick={() => setIsPlaylistPanelOpen((current) => !current)}
+				>
+					Playlist
+				</button>
+			) : null}
+			{userSettings.debugMode ? (
+				<button
+					type="button"
+					className="ptl-handwriting-predict-button"
+					style={{ bottom: userSettings.handwritingRecognition?.manualPredictButton ? '58px' : '18px' }}
+					onClick={setSelectedShapesOpacityToHalf}
+				>
+					Set Opacity 50%
+				</button>
+			) : null}
+			{pencilScrubHud.active ? (
+				<div
+					className="ptl-pencil-scrub-hud"
+					style={{
+						left: `${pencilScrubHud.left}px`,
+						top: `${pencilScrubHud.top}px`,
+					}}
+				>
+					<div className="ptl-pencil-scrub-hud-ring" aria-hidden="true">
+						<div className="ptl-pencil-scrub-hud-ring-inner" />
+					</div>
+					<div className="ptl-pencil-scrub-hud-track">
+						<div
+							className="ptl-pencil-scrub-hud-fill"
+							style={{
+								width: `${Math.round(
+									((pencilScrubHud.brushPx - PENCIL_BRUSH_MIN_PX) /
+										(PENCIL_BRUSH_MAX_PX - PENCIL_BRUSH_MIN_PX)) *
+										100
+								)}%`,
+							}}
+						/>
+					</div>
+					<div className="ptl-pencil-scrub-hud-arrow" aria-hidden="true">⇔</div>
+					<div className="ptl-pencil-scrub-hud-label">Size {pencilScrubHud.brushPx}px</div>
+				</div>
+			) : null}
+			{urlPasteDialog ? (
+				<div
+					style={{
+						position: 'absolute',
+						inset: 0,
+						zIndex: 120,
+						display: 'flex',
+						alignItems: 'center',
+						justifyContent: 'center',
+						background: 'rgb(0 0 0 / 40%)',
+					}}
+				>
+					<div
+						style={{
+							width: 'min(520px, calc(100% - 24px))',
+							background: 'var(--background-primary)',
+							border: '1px solid var(--background-modifier-border)',
+							borderRadius: '12px',
+							padding: '14px',
+							boxShadow: '0 12px 40px rgb(0 0 0 / 35%)',
+						}}
+					>
+						<div style={{ fontWeight: 700, marginBottom: '8px' }}>Paste Link</div>
+						<div
+							style={{
+								fontSize: '12px',
+								opacity: 0.8,
+								wordBreak: 'break-all',
+								marginBottom: '12px',
+							}}
+						>
+							{urlPasteDialog.url}
+						</div>
+						<div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+							<button type="button" onClick={() => resolveUrlPasteChoice('cancel')}>
+								Cancel
+							</button>
+							<button type="button" onClick={() => resolveUrlPasteChoice('text')}>
+								Paste as Text
+							</button>
+							<button
+								type="button"
+								className="mod-cta"
+								onClick={() => resolveUrlPasteChoice('iframe')}
+							>
+								Paste as Iframe
+							</button>
+						</div>
+					</div>
+				</div>
+			) : null}
+			{isPlaylistPanelOpen && selectedYoutubeEmbed ? (
+				<div className="ptl-youtube-playlist-panel">
+					<div className="ptl-youtube-playlist-header">
+						<div>
+							<div className="ptl-youtube-playlist-title">YouTube Playlist</div>
+							<div className="ptl-youtube-playlist-subtitle">
+								Shape: {selectedYoutubeEmbed.shapeId.slice(-8)}
+							</div>
+						</div>
+						<button type="button" onClick={() => setIsPlaylistPanelOpen(false)}>
+							Close
+						</button>
+					</div>
+					<textarea
+						className="ptl-youtube-playlist-input"
+						placeholder="Paste YouTube URLs or video IDs, one per line"
+						value={playlistInput}
+						onChange={(event) => setPlaylistInput(event.currentTarget.value)}
+					/>
+					<div className="ptl-youtube-playlist-actions">
+						<button type="button" className="ptl-handwriting-search-nav-button" onClick={loadPlaylistFromInput}>
+							Load Videos
+						</button>
+					</div>
+					<div className="ptl-youtube-playlist-videos">
+						{(playlistEntriesByShapeId[selectedYoutubeEmbed.shapeId] ?? []).map((entry, index) => {
+							const ids = parseYoutubeIds(entry)
+							const label = ids.videoId ? `${index + 1}. ${ids.videoId}` : `${index + 1}. Video`
+							return (
+								<button
+									type="button"
+									key={`${entry}-${index}`}
+									className="ptl-youtube-playlist-video"
+									onClick={() => updateYoutubeEmbedVideo(entry)}
+								>
+									<span className="ptl-youtube-playlist-video-label">{label}</span>
+								</button>
+							)
+						})}
+					</div>
+				</div>
+			) : null}
 			<Tldraw // This component is responsible for rendering the canvas.
 				{...storeProps}
 				assetUrls={assetUrls.current}
+				embeds={EMBED_DEFINITIONS}
 				hideUi={hideUi}
 				onUiEvent={onUiEvent}
 				overrides={overridesUi.current}

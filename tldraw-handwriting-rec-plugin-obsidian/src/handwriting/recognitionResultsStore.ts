@@ -12,6 +12,62 @@ function getStorageKey(documentId: string): string {
 	return `${RECOGNITION_RESULTS_STORAGE_KEY_PREFIX}${documentId}`
 }
 
+function isFiniteBounds(
+	bounds: unknown
+): bounds is {
+	minX: number
+	minY: number
+	maxX: number
+	maxY: number
+	width: number
+	height: number
+} {
+	if (!bounds || typeof bounds !== 'object') return false
+	const candidate = bounds as {
+		minX?: number
+		minY?: number
+		maxX?: number
+		maxY?: number
+		width?: number
+		height?: number
+	}
+	return (
+		Number.isFinite(candidate.minX) &&
+		Number.isFinite(candidate.minY) &&
+		Number.isFinite(candidate.maxX) &&
+		Number.isFinite(candidate.maxY) &&
+		Number.isFinite(candidate.width) &&
+		Number.isFinite(candidate.height)
+	)
+}
+
+function isRecognitionResult(result: unknown): result is RecognitionResult {
+	if (!result || typeof result !== 'object') return false
+	const candidate = result as Partial<RecognitionResult>
+	const statusValid =
+		candidate.status === 'pending' || candidate.status === 'success' || candidate.status === 'error'
+	const candidatesValid =
+		Array.isArray(candidate.candidates) &&
+		candidate.candidates.every(
+			(entry) =>
+				!!entry &&
+				typeof entry === 'object' &&
+				typeof (entry as { text?: unknown }).text === 'string' &&
+				Number.isFinite((entry as { confidence?: unknown }).confidence)
+		)
+
+	return (
+		typeof candidate.groupId === 'string' &&
+		Array.isArray(candidate.shapeIds) &&
+		candidate.shapeIds.every((shapeId) => typeof shapeId === 'string') &&
+		isFiniteBounds(candidate.boundingBox) &&
+		typeof candidate.fingerprint === 'string' &&
+		statusValid &&
+		Number.isFinite(candidate.updatedAt) &&
+		candidatesValid
+	)
+}
+
 function hydrateDocumentResults(documentId: string) {
 	if (!isPersistentDocument(documentId)) return
 	if (resultsByDocumentId.has(documentId)) return
@@ -22,18 +78,24 @@ function hydrateDocumentResults(documentId: string) {
 
 	try {
 		const parsed = JSON.parse(raw)
-		if (!Array.isArray(parsed)) return
+		if (!Array.isArray(parsed)) {
+			window.localStorage.removeItem(getStorageKey(documentId))
+			return
+		}
 
 		const hydrated = new Map<string, RecognitionResult>()
 		for (const item of parsed) {
-			if (!item || typeof item !== 'object') continue
-			const candidate = item as RecognitionResult
-			if (typeof candidate.groupId !== 'string') continue
-			hydrated.set(candidate.groupId, candidate)
+			if (!isRecognitionResult(item)) continue
+			hydrated.set(item.groupId, item)
 		}
 
 		if (hydrated.size > 0) {
 			resultsByDocumentId.set(documentId, hydrated)
+			if (hydrated.size !== parsed.length) {
+				window.localStorage.setItem(getStorageKey(documentId), JSON.stringify(Array.from(hydrated.values())))
+			}
+		} else {
+			window.localStorage.removeItem(getStorageKey(documentId))
 		}
 	} catch {
 		window.localStorage.removeItem(getStorageKey(documentId))

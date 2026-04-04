@@ -27,6 +27,7 @@ const DEFAULT_CAMERA_STEPS = [0.1, 0.25, 0.5, 1, 2, 4, 8]
 export const PLUGIN_ACTION_TOGGLE_ZOOM_LOCK = 'toggle-zoom-lock'
 export const PLUGIN_ACTION_HANDWRITING_SEARCH = 'handwriting-search'
 export const PLUGIN_ACTION_ASSIGN_ANCHOR_STICKER = 'assign-anchor-sticker'
+export const PLUGIN_ACTION_OPEN_EMBED_IN_NEW_TAB = 'open-embed-in-new-tab'
 
 export function uiOverrides(plugin: TldrawPlugin): TLUiOverrides {
 	const trackEvent = useUiEvents()
@@ -118,6 +119,25 @@ export function uiOverrides(plugin: TldrawPlugin): TLUiOverrides {
 				},
 			}
 
+			actions[PLUGIN_ACTION_OPEN_EMBED_IN_NEW_TAB] = {
+				id: PLUGIN_ACTION_OPEN_EMBED_IN_NEW_TAB,
+				label: {
+					default: 'Open embed URL in new tab',
+				},
+				icon: 'external-link',
+				kbd: '$shift+o',
+				readonlyOk: true,
+				onSelect() {
+					const selectedShape = editor.getOnlySelectedShape()
+					if (!selectedShape || selectedShape.type !== 'embed') return
+
+					const url = selectedShape.props?.url
+					if (typeof url !== 'string' || url.length === 0) return
+
+					window.open(url, '_blank', 'noopener,noreferrer')
+				},
+			}
+
 			return actions
 		},
 		// toolbar(editor, toolbar, { tools }) {
@@ -186,6 +206,7 @@ function pasteFromClipboardOverride(
 ): TLUiActionItem {
 	const pasteClipboard = (source: TLUiEventSource, items: ClipboardItem[]) =>
 		paste(items, source, source === 'context-menu' ? editor.inputs.currentPagePoint : undefined)
+
 	return {
 		id: 'paste',
 		label: 'action.paste',

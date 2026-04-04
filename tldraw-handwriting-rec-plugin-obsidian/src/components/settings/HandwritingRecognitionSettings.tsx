@@ -4,6 +4,7 @@ import React, { useCallback, useMemo } from 'react'
 import useSettingsManager from 'src/hooks/useSettingsManager'
 import useUserPluginSettings from 'src/hooks/useUserPluginSettings'
 import { isOnlineHtrModelConfigReady, resolveOnlineHtrModelConfig } from 'src/handwriting/modelConfig'
+import BundleImportModal from 'src/obsidian/modal/KritaBundleImportModal'
 import { DEFAULT_SETTINGS } from 'src/obsidian/TldrawSettingsTab'
 
 function HandwritingRecognitionSettingsGroup() {
@@ -25,6 +26,8 @@ function HandwritingRecognitionSettingsGroup() {
 				| 'manualPredictButton'
 				| 'searchZoomMinSizePx'
 				| 'pressureSensitivity'
+				| 'pencilOpacitySensitivity'
+				| 'pencilCrossSectionAspectRatio'
 				| 'pencilTextureIntensity'
 				| 'pencilTextureEnabled'
 				| 'showRecognizedBatchTextOverlay'
@@ -70,6 +73,8 @@ function HandwritingRecognitionSettingsGroup() {
 				| 'manualPredictButton'
 				| 'searchZoomMinSizePx'
 				| 'pressureSensitivity'
+				| 'pencilOpacitySensitivity'
+				| 'pencilCrossSectionAspectRatio'
 				| 'pencilTextureIntensity'
 				| 'pencilTextureEnabled'
 				| 'showRecognizedBatchTextOverlay'
@@ -198,6 +203,26 @@ function HandwritingRecognitionSettingsGroup() {
 			if (Number.isNaN(parsed)) return
 			const clamped = Math.max(32, Math.min(512, parsed))
 			await updateRecognitionField('searchZoomMinSizePx', Math.round(clamped))
+		},
+		[updateRecognitionField]
+	)
+
+	const onPencilOpacitySensitivityChange = useCallback(
+		async (value: string) => {
+			const parsed = Number.parseFloat(value)
+			if (Number.isNaN(parsed)) return
+			const clamped = Math.max(0, parsed)
+			await updateRecognitionField('pencilOpacitySensitivity', +clamped.toFixed(3))
+		},
+		[updateRecognitionField]
+	)
+
+	const onPencilCrossSectionAspectRatioChange = useCallback(
+		async (value: string) => {
+			const parsed = Number.parseFloat(value)
+			if (Number.isNaN(parsed)) return
+			const clamped = Math.max(1, Math.min(12, parsed))
+			await updateRecognitionField('pencilCrossSectionAspectRatio', +clamped.toFixed(2))
 		},
 		[updateRecognitionField]
 	)
@@ -358,6 +383,35 @@ function HandwritingRecognitionSettingsGroup() {
 		[updateRecognitionField]
 	)
 
+	const onOpenKritaBundleImportModal = useCallback(() => {
+		new KritaBundleImportModal(settingsManager.plugin.app, settingsManager.plugin).open()
+	}, [settingsManager])
+
+	const onKritaBundleFolderChange = useCallback(
+		async (value: string) => {
+			const trimmed = value.trim()
+			settingsManager.settings.kritaBrushBundleFolder =
+				trimmed.length > 0 ? trimmed : DEFAULT_SETTINGS.kritaBrushBundleFolder
+			await updateSettings()
+		},
+		[settingsManager, updateSettings]
+	)
+
+	const onResetKritaBundleFolder = useCallback(async () => {
+		settingsManager.settings.kritaBrushBundleFolder = DEFAULT_SETTINGS.kritaBrushBundleFolder
+		await updateSettings()
+	}, [settingsManager, updateSettings])
+
+	const onRemoveImportedKritaBundle = useCallback(
+		async (bundleId: string) => {
+			settingsManager.settings.kritaBrushBundles = (settingsManager.settings.kritaBrushBundles ?? []).filter(
+				(bundle) => bundle.id !== bundleId
+			)
+			await updateSettings()
+		},
+		[settingsManager, updateSettings]
+	)
+
 	const alphabetText = useMemo(() => {
 		const configured = settings.handwritingRecognition?.alphabet
 		if (Array.isArray(configured)) return configured.join(',')
@@ -380,6 +434,22 @@ function HandwritingRecognitionSettingsGroup() {
 		return Math.max(0.5, Math.min(5, configured))
 	}, [settings.handwritingRecognition?.pressureSensitivity])
 
+	const pencilOpacitySensitivity = useMemo(() => {
+		const configured = settings.handwritingRecognition?.pencilOpacitySensitivity
+		if (typeof configured !== 'number' || !Number.isFinite(configured)) {
+			return DEFAULT_SETTINGS.handwritingRecognition.pencilOpacitySensitivity
+		}
+		return Math.max(0, configured)
+	}, [settings.handwritingRecognition?.pencilOpacitySensitivity])
+
+	const pencilCrossSectionAspectRatio = useMemo(() => {
+		const configured = settings.handwritingRecognition?.pencilCrossSectionAspectRatio
+		if (typeof configured !== 'number' || !Number.isFinite(configured)) {
+			return DEFAULT_SETTINGS.handwritingRecognition.pencilCrossSectionAspectRatio
+		}
+		return Math.max(1, Math.min(12, configured))
+	}, [settings.handwritingRecognition?.pencilCrossSectionAspectRatio])
+
 	const searchZoomMinSize = useMemo(() => {
 		const configured = settings.handwritingRecognition?.searchZoomMinSizePx
 		if (typeof configured !== 'number' || !Number.isFinite(configured)) {
@@ -401,6 +471,16 @@ function HandwritingRecognitionSettingsGroup() {
 		if (typeof configured === 'boolean') return configured
 		return DEFAULT_SETTINGS.handwritingRecognition.pencilTextureEnabled
 	}, [settings.handwritingRecognition?.pencilTextureEnabled])
+
+	const kritaBundleFolder = useMemo(() => {
+		const configured = settings.kritaBrushBundleFolder
+		if (typeof configured !== 'string' || configured.trim().length === 0) {
+			return DEFAULT_SETTINGS.kritaBrushBundleFolder
+		}
+		return configured
+	}, [settings.kritaBrushBundleFolder])
+
+	const importedKritaBundles = useMemo(() => settings.kritaBrushBundles ?? [], [settings.kritaBrushBundles])
 
 	return (
 		<>
@@ -503,6 +583,75 @@ function HandwritingRecognitionSettingsGroup() {
 			/>
 			<Setting
 				slots={{
+					name: 'Pencil opacity sensitivity',
+					desc: 'Controls how strongly average pressure changes the whole-stroke opacity. Use the slider for quick tuning or enter any custom value in the number box.',
+					control: (
+						<>
+							<div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '300px' }}>
+								<input
+									type='range'
+									min='0'
+									max='5'
+									step='0.05'
+									value={Math.max(0, Math.min(5, pencilOpacitySensitivity))}
+									onChange={(event) => onPencilOpacitySensitivityChange(event.currentTarget.value)}
+									style={{ flex: 1 }}
+								/>
+								<input
+									type='number'
+									step='0.01'
+									min='0'
+									value={pencilOpacitySensitivity}
+									onChange={(event) => onPencilOpacitySensitivityChange(event.currentTarget.value)}
+									style={{ width: '78px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+								/>
+							</div>
+							<ExtraButton
+								icon='reset'
+								tooltip='reset'
+								onClick={() => resetModelField('pencilOpacitySensitivity')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Pencil cross-section ratio',
+					desc: 'Controls the brush cross-section aspect ratio used by the custom pencil renderer. 5.0 gives a 5:1 rectangular profile; 1.0 is the most native-like profile.',
+					control: (
+						<>
+							<div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '300px' }}>
+								<input
+									type='range'
+									min='1'
+									max='12'
+									step='0.25'
+									value={pencilCrossSectionAspectRatio}
+									onChange={(event) => onPencilCrossSectionAspectRatioChange(event.currentTarget.value)}
+									style={{ flex: 1 }}
+								/>
+								<input
+									type='number'
+									step='0.25'
+									min='1'
+									max='12'
+									value={pencilCrossSectionAspectRatio}
+									onChange={(event) => onPencilCrossSectionAspectRatioChange(event.currentTarget.value)}
+									style={{ width: '78px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+								/>
+							</div>
+							<ExtraButton
+								icon='reset'
+								tooltip='reset'
+								onClick={() => resetModelField('pencilCrossSectionAspectRatio')}
+							/>
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
 					name: 'Pencil grain texture',
 					desc: 'Enable subtle grain texture on pencil strokes for a more realistic, hand-drawn appearance.',
 					control: (
@@ -548,6 +697,71 @@ function HandwritingRecognitionSettingsGroup() {
 							/>
 						</>
 					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Krita brush bundles',
+					desc: 'Import and manage native Krita .bundle archives. Imported bundle metadata is stored in plugin settings; original bundles are saved in the vault folder below.',
+					control: (
+						<button className='mod-cta' onClick={onOpenKritaBundleImportModal}>
+							Import Krita bundle
+						</button>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: 'Krita bundle storage folder',
+					desc: 'Vault folder where imported .bundle files are copied for persistence.',
+					control: (
+						<>
+							<input
+								type='text'
+								value={kritaBundleFolder}
+								onChange={(event) => onKritaBundleFolderChange(event.currentTarget.value)}
+								style={{ minWidth: '280px' }}
+							/>
+							<ExtraButton icon='reset' tooltip='reset' onClick={onResetKritaBundleFolder} />
+						</>
+					),
+				}}
+			/>
+			<Setting
+				slots={{
+					name: `Imported Krita bundles (${importedKritaBundles.length})`,
+					desc:
+						importedKritaBundles.length > 0
+							? 'Remove entries from the library here. This only removes the indexed record, not the vault file.'
+							: 'No Krita bundles imported yet.',
+					control:
+						importedKritaBundles.length > 0 ? (
+							<div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '380px' }}>
+								{importedKritaBundles.slice(0, 8).map((bundle) => (
+									<div
+										key={bundle.id}
+										style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}
+									>
+										<div style={{ overflow: 'hidden' }}>
+											<div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+												{bundle.name}
+											</div>
+											<div style={{ fontSize: '12px', opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+												{bundle.vaultPath}
+											</div>
+										</div>
+										<button onClick={() => void onRemoveImportedKritaBundle(bundle.id)}>Remove</button>
+									</div>
+								))}
+								{importedKritaBundles.length > 8 ? (
+									<div style={{ fontSize: '12px', opacity: 0.8 }}>
+										Showing 8 of {importedKritaBundles.length} bundles.
+									</div>
+								) : null}
+							</div>
+						) : (
+							<Text readonly value='Nothing imported yet.' />
+						),
 				}}
 			/>
 			<Setting

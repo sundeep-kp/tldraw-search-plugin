@@ -90,16 +90,6 @@ export function initializeStrokeListener(
 				processedShapeIds.add(shapeId)
 
 				const totalPoints = strokes.reduce((total, segment) => total + segment.length, 0)
-				console.log('[handwriting-probe] extraction success', {
-					shapeId,
-					segments: strokes.length,
-					totalPoints,
-				})
-				console.log('[handwriting-probe] final stroke vector', {
-					shapeId,
-					strokes,
-				})
-
 				logDebug(debug, 'extracted stroke geometry', {
 					shapeId,
 					segments: strokes.length,

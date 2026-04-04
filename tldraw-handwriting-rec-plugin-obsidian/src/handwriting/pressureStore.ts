@@ -22,7 +22,7 @@ export type PressureStrokeData = {
 }
 
 export type PendingPressureSession = {
-	id: string
+	shapeId: string
 	points: PressurePoint[]
 	startedAt: number
 	endedAt?: number
@@ -40,31 +40,32 @@ class PressureDataStore {
 	private store = new Map<string, PressureStrokeData>()
 	private pendingSessions = new Map<string, PendingPressureSession>()
 
-	createPendingSession(seedPoint?: PressurePoint): string {
+	createPendingSession(shapeId: string, seedPoint?: PressurePoint): string {
+		const existing = this.pendingSessions.get(shapeId)
+		if (existing) return shapeId
 		const now = Date.now()
-		const id = `pencil-session-${now}-${Math.random().toString(16).slice(2, 8)}`
-		this.pendingSessions.set(id, {
-			id,
+		this.pendingSessions.set(shapeId, {
+			shapeId,
 			points: seedPoint ? [seedPoint] : [],
 			startedAt: now,
 		})
-		return id
+		return shapeId
 	}
 
-	appendPendingSessionPoint(sessionId: string, point: PressurePoint): void {
-		const session = this.pendingSessions.get(sessionId)
+	appendPendingSessionPoint(shapeId: string, point: PressurePoint): void {
+		const session = this.pendingSessions.get(shapeId)
 		if (!session) return
 		session.points.push(point)
 	}
 
-	endPendingSession(sessionId: string): void {
-		const session = this.pendingSessions.get(sessionId)
+	endPendingSession(shapeId: string): void {
+		const session = this.pendingSessions.get(shapeId)
 		if (!session) return
 		session.endedAt = Date.now()
 	}
 
-	cancelPendingSession(sessionId: string): void {
-		this.pendingSessions.delete(sessionId)
+	cancelPendingSession(shapeId: string): void {
+		this.pendingSessions.delete(shapeId)
 	}
 
 	getPendingSessions(): PendingPressureSession[] {
@@ -78,32 +79,23 @@ class PressureDataStore {
 	): PressureStrokeData | undefined {
 		const now = Date.now()
 		const maxAgeMs = options.maxAgeMs ?? 5_000
-		let bestMatch: PendingPressureSession | undefined
-		let bestScore = Number.POSITIVE_INFINITY
-
-		for (const session of this.pendingSessions.values()) {
-			if (!session.endedAt) continue
-			if (now - session.endedAt > maxAgeMs) continue
-			if (session.points.length === 0) continue
-
-			const pointDelta = Math.abs(rawStrokePointsCount - session.points.length)
-			const agePenalty = Math.max(0, now - session.endedAt) / 1000
-			const score = pointDelta + agePenalty
-
-			if (score < bestScore) {
-				bestScore = score
-				bestMatch = session
-			}
+		const session = this.pendingSessions.get(shapeId)
+		if (!session || !session.endedAt) return undefined
+		if (now - session.endedAt > maxAgeMs) {
+			this.pendingSessions.delete(shapeId)
+			return undefined
 		}
-
-		if (!bestMatch) return undefined
+		if (session.points.length === 0) {
+			this.pendingSessions.delete(shapeId)
+			return undefined
+		}
 
 		const resolved: PressureStrokeData = {
-			points: bestMatch.points,
-			timestamp: bestMatch.endedAt ?? now,
+			points: session.points,
+			timestamp: session.endedAt ?? now,
 		}
 
-		this.pendingSessions.delete(bestMatch.id)
+		this.pendingSessions.delete(shapeId)
 		this.store.set(shapeId, resolved)
 		return resolved
 	}
@@ -119,7 +111,16 @@ class PressureDataStore {
 	 * Get pressure data for a shape, if it exists.
 	 */
 	getPressureData(shapeId: string): PressureStrokeData | undefined {
-		return this.store.get(shapeId)
+		const resolved = this.store.get(shapeId)
+		if (resolved) return resolved
+
+		const session = this.pendingSessions.get(shapeId)
+		if (!session || session.points.length === 0) return undefined
+
+		return {
+			points: session.points,
+			timestamp: session.endedAt ?? session.startedAt,
+		}
 	}
 
 	/**

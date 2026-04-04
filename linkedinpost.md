@@ -15,3 +15,9 @@ i took the official tldraw plugin for obsidian and made it such that your handwr
 The single-language-at-a-time limitation from Google is a real constraint, not a design failure. Worth documenting clearly so users don't think it's a bug when they switch languages.
 
 the offline model thing is something i wish to offload to a contributor, i tried it lots and lots of times but couldn't succeed..On the offline model — understood, and honestly the right call to offload it. Just make sure the contributor path is well-documented: what the expected input/output format is, what accuracy threshold you'd accept, how it plugs into your existing pipeline. A good CONTRIBUTING.md here will attract the right person.
+
+
+
+
+stuff that i request other people to fix: 
+1.the debug settings in the startup tab doesn't work well.

@@ -11,6 +11,7 @@ import BoundsSelectorTool from 'src/tldraw/tools/bounds-selector-tool'
 import { logClass } from 'src/utils/logging'
 import { isObsidianThemeDark } from 'src/utils/utils'
 import { BoxLike, createDeepLinkString, Editor, TLDeepLink, TLPageId } from 'tldraw'
+import { PENCIL_SHAPE_UTILS } from 'src/tldraw/rendering/pencil-draw-shape-util'
 import { showEmbedContextMenu } from '../../helpers/show-embed-context-menu'
 import { ImageViewModeOptions, ViewMode } from '../../helpers/TldrawAppEmbedViewController'
 import { MarkdownEmbed } from '../../markdown-embed'
@@ -67,6 +68,7 @@ export class TldrawMarkdownRenderChild extends MarkdownRenderChild {
 				size: initialEmbedValues.imageSize,
 				refreshTimeoutDelay: context.refreshTimeoutDelay,
 				options: {
+					shapeUtils: PENCIL_SHAPE_UTILS,
 					assetUrls: {
 						fonts: plugin.getFontOverrides(),
 						icons: plugin.getIconOverrides(),
@@ -135,6 +137,7 @@ export class TldrawMarkdownRenderChild extends MarkdownRenderChild {
 			store: !this.#storeInstance ? undefined : { plugin: this.#storeInstance.documentStore },
 			options: {
 				// assetStore: documentStore.store.props.assets,
+				shapeUtils: PENCIL_SHAPE_UTILS,
 				onClickAwayBlur: (ev) => {
 					Promise.resolve().then(() => this.setViewMode('image'))
 					return true

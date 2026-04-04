@@ -1,5 +1,6 @@
 import { logFn, TLDRAW_STORES_MANAGER_LOGGING } from 'src/utils/logging'
 import { createTLStore, HistoryEntry, TLRecord, TLStore } from 'tldraw'
+import { PENCIL_SHAPE_UTILS } from 'src/tldraw/rendering/pencil-draw-shape-util'
 
 export type StoreInstanceInfo<T> = {
 	instanceId: string
@@ -217,6 +218,7 @@ function createSourceStore<Group extends StoreGroup>(storeGroup: Group): TLStore
 	const snapshot = storeGroup.main.store.getStoreSnapshot()
 	const store = createTLStore({
 		snapshot: snapshot,
+		shapeUtils: PENCIL_SHAPE_UTILS,
 	})
 
 	// NOTE: We want to preserve the assets object that is attached to props, otherwise the context will be lost if provided as a param in createTLStore

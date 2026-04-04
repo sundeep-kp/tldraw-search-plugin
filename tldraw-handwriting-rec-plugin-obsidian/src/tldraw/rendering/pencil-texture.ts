@@ -69,13 +69,14 @@ export function createPencilGrainFilter(filterId: string, intensity: number = 0.
  */
 export function getPressureOpacityStyle(
 	basePressure: number,
-	minOpacity: number = 0.3,
-	maxOpacity: number = 1.0
+	minOpacity: number = 0.02,
+	maxOpacity: number = 0.45
 ): number {
 	// Clamp pressure to [0, 1]
 	const p = Math.max(0, Math.min(1, basePressure))
-	// Map to opacity range
-	return minOpacity + p * (maxOpacity - minOpacity)
+	// Mild nonlinear contrast while preserving enough mid-range variation.
+	const contrastPressure = p * p * 0.8 + p * 0.2
+	return minOpacity + contrastPressure * (maxOpacity - minOpacity)
 }
 
 /**

@@ -1,5 +1,6 @@
 import { TLDataDocument, TLDataDocumentStore, TldrawPluginMetaData } from 'src/utils/document'
-import { TLStore, createTLStore, defaultShapeUtils } from 'tldraw'
+import { TLStore, createTLStore } from 'tldraw'
+import { PENCIL_SHAPE_UTILS } from 'src/tldraw/rendering/pencil-draw-shape-util'
 
 export function processInitialData(initialData: TLDataDocument): TLDataDocumentStore {
 	const {
@@ -16,7 +17,7 @@ export function processInitialData(initialData: TLDataDocument): TLDataDocumentS
 		return {
 			meta: initialData.meta,
 			store: createTLStore({
-				shapeUtils: defaultShapeUtils,
+				shapeUtils: PENCIL_SHAPE_UTILS,
 				initialData: initialData.raw,
 			}),
 		}

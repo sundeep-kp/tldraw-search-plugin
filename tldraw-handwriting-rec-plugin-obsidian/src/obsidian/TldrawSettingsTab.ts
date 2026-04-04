@@ -81,6 +81,56 @@ export type UserTLCameraOptions = Pick<
 	'panSpeed' | 'zoomSpeed' | 'zoomSteps' | 'wheelBehavior'
 >
 
+export type KritaBundleResourceType = 'brush-preset' | 'brush-tip' | 'pattern' | 'gradient' | 'workspace' | 'other'
+
+export type KritaBundleManifestEntry = {
+	fullPath: string
+	mediaType?: string
+	md5?: string
+	tags: string[]
+	resourceType: KritaBundleResourceType
+	name: string
+}
+
+export type KritaBundleMetadata = {
+	title?: string
+	author?: string
+	description?: string
+	generator?: string
+	version?: string
+	created?: string
+	modified?: string
+}
+
+export type KritaDerivedPresetStyle = {
+	pencilBrushSizePx: number
+	pencilOpacitySensitivity: number
+	pencilTextureIntensity: number
+	pencilCrossSectionAspectRatio: number
+	pencilTextureEnabled: boolean
+}
+
+export type KritaBundleImportSummary = {
+	fileName: string
+	bundleName: string
+	meta: KritaBundleMetadata
+	manifestEntries: KritaBundleManifestEntry[]
+	presetEntries: KritaBundleManifestEntry[]
+	derivedPresetStyles?: Record<string, KritaDerivedPresetStyle>
+	resourceEntries: KritaBundleManifestEntry[]
+	previewEntryPath?: string
+	warnings: string[]
+}
+
+export type KritaImportedBrushBundleRecord = {
+	id: string
+	name: string
+	originalFileName: string
+	vaultPath: string
+	importedAt: string
+	summary: KritaBundleImportSummary
+}
+
 /**
  * tldraw views, but for the `.md` extension
  */
@@ -97,6 +147,16 @@ export interface TldrawPluginSettings extends DeprecatedFileDestinationSettings 
 	gridMode: boolean
 	snapMode: boolean
 	debugMode: boolean
+	debugLogs?: {
+		recognitionEngine?: boolean
+		recognitionEvents?: boolean
+		handwritingSearch?: boolean
+		opacityOverwriteCheck?: boolean
+		pencilDefaultStroke?: boolean
+		pencilBaseStroke?: boolean
+		pencilSampledOverlay?: boolean
+		pencilFallbackStyling?: boolean
+	}
 	focusMode: boolean
 	fonts?: {
 		overrides?: FontOverrides
@@ -131,6 +191,8 @@ export interface TldrawPluginSettings extends DeprecatedFileDestinationSettings 
 	clipboard?: {
 		pasteAtCursor?: boolean
 	}
+	kritaBrushBundleFolder?: string
+	kritaBrushBundles?: KritaImportedBrushBundleRecord[]
 	workspace: {
 		/**
 		 * Tldraw markdown files (with the `.md` extension) will open as this type when clicked on.
@@ -163,6 +225,9 @@ export interface TldrawPluginSettings extends DeprecatedFileDestinationSettings 
 		pencilBrushSizePx?: number
 		searchZoomMinSizePx?: number
 		pressureSensitivity?: number
+		pencilOpacitySensitivity?: number
+		pencilCrossSectionAspectRatio?: number
+		kritaSelectedPresetId?: string
 		pencilTextureIntensity?: number
 		pencilTextureEnabled?: boolean
 		showRecognizedBatchTextOverlay?: boolean
@@ -202,6 +267,16 @@ export const DEFAULT_SETTINGS = {
 	gridMode: false,
 	snapMode: false,
 	debugMode: false,
+	debugLogs: {
+		recognitionEngine: true,
+		recognitionEvents: true,
+		handwritingSearch: true,
+		opacityOverwriteCheck: true,
+		pencilDefaultStroke: true,
+		pencilBaseStroke: true,
+		pencilSampledOverlay: true,
+		pencilFallbackStyling: true,
+	},
 	focusMode: false,
 	fileDestinations: {
 		confirmDestination: true,
@@ -222,12 +297,17 @@ export const DEFAULT_SETTINGS = {
 	file: {
 		insertTags: true,
 	},
+	kritaBrushBundleFolder: 'tldraw/krita-bundles',
+	kritaBrushBundles: [],
 	handwritingRecognition: {
 		backend: 'auto',
 		manualPredictButton: true,
 		pencilBrushSizePx: 24,
 		searchZoomMinSizePx: 64,
 		pressureSensitivity: 2.5,
+		pencilOpacitySensitivity: 1,
+		pencilCrossSectionAspectRatio: 5,
+		kritaSelectedPresetId: '',
 		pencilTextureIntensity: 0.35,
 		pencilTextureEnabled: true,
 		showRecognizedBatchTextOverlay: false,
