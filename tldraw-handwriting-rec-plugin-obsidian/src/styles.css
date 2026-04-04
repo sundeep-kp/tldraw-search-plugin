@@ -219,18 +219,27 @@
 .tldraw-view-root .ptl-youtube-playlist-panel {
 	position: absolute;
 	top: 12px;
-	right: 12px;
+	right: 0;
 	z-index: 24;
-	width: min(360px, calc(100% - 24px));
+	width: min(272px, calc(100% - 12px));
 	max-height: min(70vh, 560px);
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
 	padding: 10px;
 	border-radius: 10px;
-	background: color-mix(in srgb, var(--background-primary) 94%, var(--background-secondary));
-	border: 1px solid color-mix(in srgb, var(--interactive-accent) 25%, var(--background-modifier-border));
-	box-shadow: 0 8px 20px rgb(0 0 0 / 25%);
+	background: linear-gradient(
+		140deg,
+		rgb(255 255 255 / 36%),
+		rgb(255 255 255 / 20%) 42%,
+		rgb(255 255 255 / 12%)
+	);
+	border: 1px solid rgb(255 255 255 / 40%);
+	backdrop-filter: blur(14px) saturate(145%);
+	-webkit-backdrop-filter: blur(14px) saturate(145%);
+	box-shadow:
+		0 14px 40px rgb(0 0 0 / 30%),
+		inset 0 1px 0 rgb(255 255 255 / 30%);
 }
 
 .tldraw-view-root .ptl-youtube-playlist-header {
@@ -243,12 +252,12 @@
 .tldraw-view-root .ptl-youtube-playlist-title {
 	font-size: 13px;
 	font-weight: 700;
-	color: var(--text-normal);
+	color: color-mix(in srgb, var(--text-normal) 92%, black);
 }
 
 .tldraw-view-root .ptl-youtube-playlist-subtitle {
 	font-size: 11px;
-	color: var(--text-muted);
+	color: color-mix(in srgb, var(--text-muted) 82%, black);
 }
 
 .tldraw-view-root .ptl-youtube-playlist-input {
@@ -259,9 +268,28 @@
 	line-height: 1.4;
 	padding: 7px 9px;
 	border-radius: 8px;
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-primary);
+	border: 1px solid rgb(255 255 255 / 22%);
+	background: rgb(255 255 255 / 16%);
 	color: var(--text-normal);
+}
+
+.tldraw-view-root .ptl-youtube-playlist-manual-input {
+	width: 100%;
+	min-height: 72px;
+	resize: vertical;
+	font-size: 12px;
+	line-height: 1.4;
+	padding: 7px 9px;
+	border-radius: 8px;
+	border: 1px solid rgb(255 255 255 / 22%);
+	background: rgb(255 255 255 / 14%);
+	color: var(--text-normal);
+}
+
+.tldraw-view-root .ptl-youtube-playlist-status {
+	font-size: 12px;
+	color: color-mix(in srgb, var(--text-normal) 72%, black);
+	line-height: 1.4;
 }
 
 .tldraw-view-root .ptl-youtube-playlist-actions {
@@ -282,20 +310,80 @@
 	text-align: left;
 	padding: 7px 9px;
 	border-radius: 8px;
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-primary);
+	border: 1px solid rgb(255 255 255 / 16%);
+	background: rgb(255 255 255 / 16%);
 	color: var(--text-normal);
 	cursor: pointer;
+	transition:
+		background-color 140ms ease,
+		border-color 140ms ease,
+		transform 140ms ease;
+}
+
+.tldraw-view-root .ptl-youtube-playlist-video:hover {
+	background: rgb(255 255 255 / 24%);
+	border-color: rgb(255 255 255 / 40%);
+	transform: translateY(-1px);
+}
+
+.tldraw-view-root .ptl-youtube-playlist-video.is-active {
+	border-color: color-mix(in srgb, var(--interactive-accent) 55%, rgb(255 255 255 / 35%));
+	background: color-mix(in srgb, var(--interactive-accent) 22%, rgb(255 255 255 / 12%));
+	box-shadow:
+		inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 48%, transparent),
+		0 4px 14px rgb(0 0 0 / 16%);
 }
 
 .tldraw-view-root .ptl-youtube-playlist-video-label {
 	font-size: 12px;
-	font-weight: 600;
+	font-weight: 700;
+	color: color-mix(in srgb, var(--text-normal) 88%, black);
+	text-shadow: 0 1px 0 rgb(255 255 255 / 16%);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	display: block;
 }
+
+.tldraw-view-root .ptl-youtube-playlist-video.is-active .ptl-youtube-playlist-video-label {
+	color: color-mix(in srgb, var(--text-normal) 92%, black);
+}
+
+.ptl-youtube-playlist-hover-preview-fixed {
+	position: fixed;
+	top: 44px;
+	left: 8px;
+	z-index: 100001;
+	width: 320px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px;
+	border-radius: 14px;
+	background: rgba(11, 16, 24, 0.96);
+	border: 1px solid rgb(255 255 255 / 24%);
+	box-shadow: 0 16px 36px rgb(0 0 0 / 38%);
+	pointer-events: none;
+	color: #fff;
+}
+
+.tldraw-view-root .ptl-youtube-playlist-hover-preview-image {
+	width: 100%;
+	aspect-ratio: 16 / 9;
+	object-fit: cover;
+	border-radius: 8px;
+	display: block;
+}
+
+.tldraw-view-root .ptl-youtube-playlist-hover-preview-title {
+	font-size: 12px;
+	line-height: 1.35;
+	font-weight: 700;
+	color: #f8fbff;
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+
 
 .tldraw-view-root .ptl-pencil-scrub-hud {
 	position: absolute;

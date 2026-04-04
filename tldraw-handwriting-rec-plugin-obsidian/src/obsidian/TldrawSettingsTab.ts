@@ -108,6 +108,11 @@ export type KritaDerivedPresetStyle = {
 	pencilTextureIntensity: number
 	pencilCrossSectionAspectRatio: number
 	pencilTextureEnabled: boolean
+	brushTipData: Uint8Array | null
+	spacingFactor: number
+	sizeCurveExponent: number
+	opacityCurveExponent: number
+	rotationJitter: number
 }
 
 export type KritaBundleImportSummary = {

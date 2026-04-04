@@ -30,6 +30,11 @@ export type KritaDerivedPresetStyle = {
 	pencilTextureIntensity: number
 	pencilCrossSectionAspectRatio: number
 	pencilTextureEnabled: boolean
+	brushTipData: Uint8Array | null
+	spacingFactor: number
+	sizeCurveExponent: number
+	opacityCurveExponent: number
+	rotationJitter: number
 }
 
 export type KritaBundleImportSummary = {
@@ -141,7 +146,6 @@ function parseManifestXml(manifestXml: string): KritaBundleManifestEntry[] {
 
 function parseMetaXml(metaXml: string): KritaBundleMetadata {
 	const document = parseXml(metaXml)
-	const meta = Array.from(document.getElementsByTagName('*')).find((node) => node.tagName.endsWith(':meta'))
 	const lookup = (tagSuffix: string) =>
 		Array.from(document.getElementsByTagName('*')).find((node) => node.tagName.endsWith(`:${tagSuffix}`))
 	return {
@@ -159,6 +163,12 @@ async function getZipEntryText(zip: JSZip, path: string) {
 	const entry = zip.file(path)
 	if (!entry) return undefined
 	return entry.async('text')
+}
+
+async function getZipEntryBytes(zip: JSZip, path: string) {
+	const entry = zip.file(path)
+	if (!entry) return undefined
+	return entry.async('uint8array')
 }
 
 async function getZipEntryTextByBundlePath(zip: JSZip, path: string) {
@@ -181,6 +191,26 @@ async function getZipEntryTextByBundlePath(zip: JSZip, path: string) {
 	return undefined
 }
 
+async function getZipEntryBytesByBundlePath(zip: JSZip, path: string) {
+	const normalized = normalizeBundlePath(path)
+	const directCandidates = [normalized, `./${normalized}`, `/${normalized}`]
+
+	for (const candidate of directCandidates) {
+		const bytes = await getZipEntryBytes(zip, candidate)
+		if (bytes) return bytes
+	}
+
+	const normalizedLookup = normalized.toLowerCase()
+	for (const key of Object.keys(zip.files)) {
+		if (normalizeBundlePath(key).toLowerCase() === normalizedLookup) {
+			const bytes = await getZipEntryBytes(zip, key)
+			if (bytes) return bytes
+		}
+	}
+
+	return undefined
+}
+
 function clamp(value: number, min: number, max: number) {
 	return Math.max(min, Math.min(max, value))
 }
@@ -190,6 +220,164 @@ function parseNumber(value: string | null | undefined) {
 	const parsed = Number.parseFloat(value)
 	if (!Number.isFinite(parsed)) return undefined
 	return parsed
+}
+
+function findParamElements(document: Document, paramName: string): Element[] {
+	const wanted = paramName.trim().toLowerCase()
+	if (!wanted) return []
+
+	return Array.from(document.getElementsByTagName('*')).filter((node) => {
+		const localName = (node.localName || node.tagName || '').toLowerCase()
+		if (localName !== 'param') return false
+		const name = node.getAttribute('name')?.trim().toLowerCase()
+		return name === wanted
+	})
+}
+
+function getParamStringValue(param: Element): string | undefined {
+	const attrValue =
+		param.getAttribute('value') ??
+		param.getAttribute('val') ??
+		param.getAttribute('string') ??
+		param.getAttribute('filename')
+	if (attrValue?.trim()) return attrValue.trim()
+
+	const text = param.textContent?.trim()
+	if (text) return text
+
+	return undefined
+}
+
+function parseFloatParam(document: Document, paramNames: string[]): number | undefined {
+	for (const name of paramNames) {
+		const params = findParamElements(document, name)
+		for (const param of params) {
+			const value = parseNumber(getParamStringValue(param))
+			if (value !== undefined) return value
+		}
+	}
+	return undefined
+}
+
+function parseCurvePointsFromString(raw: string): Array<{ x: number; y: number }> {
+	const points: Array<{ x: number; y: number }> = []
+	const pairs = raw
+		.split(';')
+		.map((part) => part.trim())
+		.filter(Boolean)
+
+	for (const pair of pairs) {
+		const [xRaw, yRaw] = pair.split(',').map((part) => part.trim())
+		const x = Number.parseFloat(xRaw ?? '')
+		const y = Number.parseFloat(yRaw ?? '')
+		if (!Number.isFinite(x) || !Number.isFinite(y)) continue
+		points.push({ x, y })
+	}
+
+	return points
+}
+
+function parseCurvePointsFromParam(document: Document, paramName: string): Array<{ x: number; y: number }> {
+	const params = findParamElements(document, paramName)
+	for (const param of params) {
+		const candidates: string[] = []
+
+		const direct = getParamStringValue(param)
+		if (direct) candidates.push(direct)
+
+		for (const node of Array.from(param.getElementsByTagName('*'))) {
+			for (const attrName of node.getAttributeNames()) {
+				const value = node.getAttribute(attrName)
+				if (value) candidates.push(value)
+			}
+			if (node.textContent?.trim()) candidates.push(node.textContent.trim())
+		}
+
+		for (const candidate of candidates) {
+			if (!candidate.includes(',')) continue
+			const points = parseCurvePointsFromString(candidate)
+			if (points.length >= 2) return points
+		}
+	}
+
+	return []
+}
+
+function sampleCurveY(points: Array<{ x: number; y: number }>, targetX: number): number | undefined {
+	if (points.length === 0) return undefined
+	const sorted = [...points].sort((a, b) => a.x - b.x)
+	if (targetX <= sorted[0].x) return sorted[0].y
+	if (targetX >= sorted[sorted.length - 1].x) return sorted[sorted.length - 1].y
+
+	for (let i = 0; i < sorted.length - 1; i++) {
+		const a = sorted[i]
+		const b = sorted[i + 1]
+		if (targetX < a.x || targetX > b.x) continue
+		const dx = b.x - a.x
+		if (Math.abs(dx) < 1e-6) return a.y
+		const t = (targetX - a.x) / dx
+		return a.y + (b.y - a.y) * t
+	}
+
+	return undefined
+}
+
+function fitCurveExponent(points: Array<{ x: number; y: number }>, fallback: number): number {
+	if (points.length < 2) return fallback
+	const x1 = 1 / 3
+	const x2 = 2 / 3
+	const y1 = sampleCurveY(points, x1)
+	const y2 = sampleCurveY(points, x2)
+	if (y1 === undefined || y2 === undefined || y1 <= 0 || y2 <= 0) return fallback
+	const exponent = Math.log(y2 / y1) / Math.log(x2 / x1)
+	if (!Number.isFinite(exponent)) return fallback
+	return clamp(exponent, 0.05, 4)
+}
+
+function extractBrushTipFilename(document: Document, kppXml: string): string | undefined {
+	for (const param of findParamElements(document, 'filename')) {
+		const value = getParamStringValue(param)
+		if (value) return value
+	}
+
+	for (const param of findParamElements(document, 'brush_definition')) {
+		for (const node of Array.from(param.getElementsByTagName('*'))) {
+			const localName = (node.localName || node.tagName || '').toLowerCase()
+			if (localName !== 'brush') continue
+			const filename = node.getAttribute('filename')?.trim()
+			if (filename) return filename
+		}
+
+		const text = param.textContent ?? ''
+		const match = text.match(/<brush[^>]*filename\s*=\s*['"]([^'"]+)['"]/i)
+		if (match?.[1]) return match[1].trim()
+	}
+
+	const fallbackMatch = kppXml.match(/<brush[^>]*filename\s*=\s*['"]([^'"]+)['"]/i)
+	if (fallbackMatch?.[1]) return fallbackMatch[1].trim()
+
+	return undefined
+}
+
+async function extractBrushTipData(
+	zip: JSZip,
+	filename: string | undefined
+): Promise<Uint8Array | null> {
+	if (!filename) return null
+	const normalizedFilename = normalizeBundlePath(filename)
+	const basename = normalizedFilename.split('/').at(-1) ?? normalizedFilename
+	const candidates = [
+		normalizedFilename,
+		`kis_brushes/${basename}`,
+		`brushes/${basename}`,
+	]
+
+	for (const candidate of candidates) {
+		const bytes = await getZipEntryBytesByBundlePath(zip, candidate)
+		if (bytes) return bytes
+	}
+
+	return null
 }
 
 function collectNumericSignals(xmlText: string): Map<string, number[]> {
@@ -232,7 +420,13 @@ function pickSignalAverage(signals: Map<string, number[]>, keywords: string[]) {
 	return matches.reduce((sum, value) => sum + value, 0) / matches.length
 }
 
-function derivePresetStyleFromKppText(presetName: string, presetPath: string, kppXml: string): KritaDerivedPresetStyle {
+async function derivePresetStyleFromKppText(
+	zip: JSZip,
+	presetName: string,
+	presetPath: string,
+	kppXml: string
+): Promise<KritaDerivedPresetStyle> {
+	const kppDocument = parseXml(kppXml)
 	const signals = collectNumericSignals(kppXml)
 	const identity = `${presetName}:${presetPath}`.toLowerCase()
 
@@ -272,12 +466,26 @@ function derivePresetStyleFromKppText(presetName: string, presetPath: string, kp
 		pencilCrossSectionAspectRatio = Math.min(pencilCrossSectionAspectRatio, 2.2)
 	}
 
+	const spacingFactor = parseFloatParam(kppDocument, ['Spacing/isotropic', 'spacing']) ?? 0.2
+	const sizeCurvePoints = parseCurvePointsFromParam(kppDocument, 'PressureSize')
+	const sizeCurveExponent = fitCurveExponent(sizeCurvePoints, 0.7)
+	const opacityCurvePoints = parseCurvePointsFromParam(kppDocument, 'PressureOpacity')
+	const opacityCurveExponent = fitCurveExponent(opacityCurvePoints, 1.2)
+	const rotationJitterRaw = parseFloatParam(kppDocument, ['rotation', 'jitter']) ?? 0
+	const brushTipFilename = extractBrushTipFilename(kppDocument, kppXml)
+	const brushTipData = await extractBrushTipData(zip, brushTipFilename)
+
 	return {
 		pencilBrushSizePx: Math.round(clamp(pencilBrushSizePx, 1, 600)),
 		pencilOpacitySensitivity: +clamp(pencilOpacitySensitivity, 0, 5).toFixed(2),
 		pencilTextureIntensity: +clamp(pencilTextureIntensity, 0, 1).toFixed(2),
 		pencilCrossSectionAspectRatio: +clamp(pencilCrossSectionAspectRatio, 1, 12).toFixed(2),
 		pencilTextureEnabled: true,
+		brushTipData,
+		spacingFactor: +Math.max(0.01, spacingFactor).toFixed(3),
+		sizeCurveExponent: +sizeCurveExponent.toFixed(3),
+		opacityCurveExponent: +opacityCurveExponent.toFixed(3),
+		rotationJitter: +clamp(rotationJitterRaw, 0, 1).toFixed(3),
 	}
 }
 
@@ -301,7 +509,12 @@ export async function parseKritaBundle(file: File): Promise<KritaBundleImportSum
 		const presetXml = await getZipEntryTextByBundlePath(zip, preset.fullPath)
 		if (!presetXml) continue
 		try {
-			derivedPresetStyles[preset.fullPath] = derivePresetStyleFromKppText(preset.name, preset.fullPath, presetXml)
+			derivedPresetStyles[preset.fullPath] = await derivePresetStyleFromKppText(
+				zip,
+				preset.name,
+				preset.fullPath,
+				presetXml
+			)
 		} catch (error) {
 			warnings.push(`Could not parse preset parameters for ${preset.name}.`)
 			console.warn('[KritaBundle] preset parse failed', { presetPath: preset.fullPath, error })

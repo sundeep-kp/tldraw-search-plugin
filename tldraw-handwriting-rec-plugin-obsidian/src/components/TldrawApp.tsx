@@ -2,6 +2,7 @@ import Fuse from 'fuse.js'
 import { Menu, Notice, Platform, TAbstractFile, TFile } from 'obsidian'
 import * as React from 'react'
 import { createRoot } from 'react-dom/client'
+import { createPortal } from 'react-dom'
 import { lockZoomIcon } from 'src/assets/data-icons'
 import { TldrawInObsidianPluginProvider } from 'src/contexts/plugin'
 import { useTldrawPlugin } from 'src/contexts/plugin'
@@ -113,6 +114,10 @@ import {
 import { getPressureOpacityStyle } from 'src/tldraw/rendering/pencil-texture'
 import PluginKeyboardShortcutsDialog from './PluginKeyboardShortcutsDialog'
 import PluginQuickActions from './PluginQuickActions'
+import {
+	extractYoutubePlaylistVideoIds,
+	getYoutubePlaylistIdFromUrl,
+} from 'src/obsidian/youtube/playlist-extractor'
 
 type TldrawAppOptions = {
 	iconAssetUrls?: TLUiAssetUrlOverrides['icons']
@@ -563,6 +568,18 @@ type YoutubeEmbedSelection = {
 	videoId?: string
 }
 
+type YoutubePlaylistEntry = {
+	url: string
+	title?: string
+}
+
+type PlaylistHoverPreview = {
+	title: string
+	thumbnailUrl: string
+	left: number
+	top: number
+}
+
 const DEFAULT_SEARCH_FOCUS_MIN_SIZE = 64
 const SEARCH_FOCUS_PADDING = 20
 const ANCHOR_MENTIONS_FRONTMATTER_KEY = 'tldraw-canvas-mentions'
@@ -634,6 +651,11 @@ function parseYoutubeIds(url: string): { videoId?: string; playlistId?: string }
 	}
 }
 
+function isYoutubePlaylistUrl(url: string): boolean {
+	const ids = parseYoutubeIds(url)
+	return typeof ids.playlistId === 'string' && ids.playlistId.length > 0
+}
+
 function buildYoutubeWatchUrl(videoId: string, playlistId?: string): string {
 	const url = new URL('https://www.youtube.com/watch')
 	url.searchParams.set('v', videoId)
@@ -641,6 +663,11 @@ function buildYoutubeWatchUrl(videoId: string, playlistId?: string): string {
 		url.searchParams.set('list', playlistId)
 	}
 	return url.toString()
+}
+
+function buildYoutubeThumbnailUrl(videoId?: string): string | undefined {
+	if (!videoId) return
+	return `https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/mqdefault.jpg`
 }
 
 function normalizeYoutubeVideoEntry(raw: string): string | undefined {
@@ -658,6 +685,10 @@ function normalizeYoutubeVideoEntry(raw: string): string | undefined {
 
 function buildPlaylistStorageKey(documentId: string, shapeId: string): string {
 	return `ptl.youtube-playlist.v1:${documentId}:${shapeId}`
+}
+
+function buildPlaylistLastOpenedStorageKey(documentId: string, shapeId: string): string {
+	return `ptl.youtube-playlist.last-opened.v1:${documentId}:${shapeId}`
 }
 
 function clampUnit(value: number): number {
@@ -806,11 +837,17 @@ const TldrawApp = ({
 	const [isSearchPanelOpen, setIsSearchPanelOpen] = React.useState(false)
 	const [isPlaylistPanelOpen, setIsPlaylistPanelOpen] = React.useState(false)
 	const [searchQuery, setSearchQuery] = React.useState('')
+	const [playlistUrlInput, setPlaylistUrlInput] = React.useState('')
 	const [playlistInput, setPlaylistInput] = React.useState('')
+	const [playlistLoading, setPlaylistLoading] = React.useState(false)
+	const [playlistStatus, setPlaylistStatus] = React.useState<string | undefined>(undefined)
 	const [selectedSearchResultIndex, setSelectedSearchResultIndex] = React.useState(-1)
 	const [activeSearchGroupId, setActiveSearchGroupId] = React.useState<string | undefined>(undefined)
 	const [selectedYoutubeEmbed, setSelectedYoutubeEmbed] = React.useState<YoutubeEmbedSelection | null>(null)
-	const [playlistEntriesByShapeId, setPlaylistEntriesByShapeId] = React.useState<Record<string, string[]>>({})
+	const [playlistEntriesByShapeId, setPlaylistEntriesByShapeId] = React.useState<
+		Record<string, YoutubePlaylistEntry[]>
+	>({})
+	const [playlistHoverPreview, setPlaylistHoverPreview] = React.useState<PlaylistHoverPreview | null>(null)
 	const [pencilScrubHud, setPencilScrubHud] = React.useState<PencilScrubHudState>({
 		active: false,
 		left: 0,
@@ -831,6 +868,7 @@ const TldrawApp = ({
 	const urlPasteDialogResolverRef = React.useRef<
 		((choice: 'iframe' | 'text' | 'cancel') => void) | null
 	>(null)
+	const playlistAutoImportKeyRef = React.useRef<string | null>(null)
 	const handwritingDocumentId = React.useMemo(() => {
 		if (store && 'plugin' in store && store.plugin) {
 			return store.plugin.meta.uuid
@@ -847,6 +885,23 @@ const TldrawApp = ({
 		}
 		return Math.max(32, Math.min(512, configured))
 	}, [userSettings.handwritingRecognition?.searchZoomMinSizePx])
+
+	const playlistHoverPreviewOverlay =
+		playlistHoverPreview && ownerDocument?.body
+			? createPortal(
+				<div className="ptl-youtube-playlist-hover-preview-fixed">
+					<img
+						className="ptl-youtube-playlist-hover-preview-image"
+						src={playlistHoverPreview.thumbnailUrl}
+						alt={playlistHoverPreview.title}
+					/>
+					<div className="ptl-youtube-playlist-hover-preview-title">
+						{playlistHoverPreview.title}
+					</div>
+				</div>,
+				ownerDocument.body
+			  )
+			: null
 
 	const setFocusedEditor = (isMounting: boolean, editor?: Editor) => {
 		const { currTldrawEditor } = plugin
@@ -917,8 +972,14 @@ const TldrawApp = ({
 				return editor.putExternalContent({ type: 'text', text: parsed.toString(), point })
 			}
 
-			const choice = await requestUrlPasteChoice(parsed.toString(), point)
-			if (choice === 'cancel') return
+			// Playlist links are always treated as embeds so they can be auto-imported.
+			const isPlaylistLink = isYoutubePlaylistUrl(parsed.toString())
+
+			let choice: 'iframe' | 'text' | 'cancel' = 'iframe'
+			if (!isPlaylistLink) {
+				choice = await requestUrlPasteChoice(parsed.toString(), point)
+				if (choice === 'cancel') return
+			}
 
 			if (choice === 'text') {
 				return editor.putExternalContent({ type: 'text', text: parsed.toString(), point })
@@ -977,6 +1038,7 @@ const TldrawApp = ({
 			const selected = editor.getOnlySelectedShape()
 			if (!selected || selected.type !== 'embed') {
 				setSelectedYoutubeEmbed(null)
+				setPlaylistStatus(undefined)
 				return
 			}
 
@@ -1003,6 +1065,7 @@ const TldrawApp = ({
 					playlistId: ids.playlistId,
 				}
 			})
+			setPlaylistUrlInput(url)
 		}
 
 		syncSelectedYoutubeEmbed()
@@ -1011,17 +1074,44 @@ const TldrawApp = ({
 	}, [editor])
 
 	React.useEffect(() => {
+		if (!selectedYoutubeEmbed) {
+			setIsPlaylistPanelOpen(false)
+			setPlaylistHoverPreview(null)
+			return
+		}
+
+		// Auto-open the sidebar when a playlist embed is selected.
+		if (selectedYoutubeEmbed.playlistId) {
+			setIsPlaylistPanelOpen(true)
+		}
+	}, [selectedYoutubeEmbed])
+
+	React.useEffect(() => {
 		if (!selectedYoutubeEmbed) return
 		if (playlistEntriesByShapeId[selectedYoutubeEmbed.shapeId]) return
 
 		const storageKey = buildPlaylistStorageKey(handwritingDocumentId, selectedYoutubeEmbed.shapeId)
-		let nextEntries: string[] = []
+		let nextEntries: YoutubePlaylistEntry[] = []
 		try {
 			const raw = window.localStorage.getItem(storageKey)
 			if (raw) {
 				const parsed = JSON.parse(raw)
 				if (Array.isArray(parsed)) {
-					nextEntries = parsed.filter((entry): entry is string => typeof entry === 'string')
+					nextEntries = parsed
+						.map((entry): YoutubePlaylistEntry | undefined => {
+							if (typeof entry === 'string') {
+								return { url: entry }
+							}
+							if (!entry || typeof entry !== 'object') return
+							const candidateUrl = (entry as { url?: unknown }).url
+							if (typeof candidateUrl !== 'string' || candidateUrl.trim().length === 0) return
+							const candidateTitle = (entry as { title?: unknown }).title
+							return {
+								url: candidateUrl,
+								title: typeof candidateTitle === 'string' ? candidateTitle : undefined,
+							}
+						})
+						.filter((entry): entry is YoutubePlaylistEntry => !!entry)
 				}
 			}
 		} catch {
@@ -1029,7 +1119,9 @@ const TldrawApp = ({
 		}
 
 		if (nextEntries.length === 0 && selectedYoutubeEmbed.videoId) {
-			nextEntries = [buildYoutubeWatchUrl(selectedYoutubeEmbed.videoId, selectedYoutubeEmbed.playlistId)]
+			nextEntries = [{
+				url: buildYoutubeWatchUrl(selectedYoutubeEmbed.videoId, selectedYoutubeEmbed.playlistId),
+			}]
 		}
 
 		setPlaylistEntriesByShapeId((current) => ({
@@ -1057,11 +1149,86 @@ const TldrawApp = ({
 				},
 			])
 
+			const lastOpenedKey = buildPlaylistLastOpenedStorageKey(
+				handwritingDocumentId,
+				selectedYoutubeEmbed.shapeId
+			)
+			window.localStorage.setItem(lastOpenedKey, nextUrl)
+
 			editor.setSelectedShapes([selectedYoutubeEmbed.shapeId])
 			editor.setEditingShape(selectedYoutubeEmbed.shapeId)
 		},
-		[editor, selectedYoutubeEmbed]
+		[editor, handwritingDocumentId, selectedYoutubeEmbed]
 	)
+
+	const importYoutubePlaylistFromUrl = React.useCallback(
+		async (playlistSourceUrl: string) => {
+			if (!selectedYoutubeEmbed) return
+
+			const input = playlistSourceUrl.trim()
+			if (!input) {
+				setPlaylistStatus('Paste a YouTube playlist URL first.')
+				return
+			}
+
+			setPlaylistLoading(true)
+			setPlaylistStatus('Fetching playlist…')
+
+			try {
+				const result = await extractYoutubePlaylistVideoIds(input)
+				const dedupedByUrl = new Map<string, YoutubePlaylistEntry>()
+				for (const video of result.videos) {
+					if (!dedupedByUrl.has(video.videoUrl)) {
+						dedupedByUrl.set(video.videoUrl, {
+							url: video.videoUrl,
+							title: video.title,
+						})
+					}
+				}
+				const uniqueEntries = Array.from(dedupedByUrl.values())
+				const storageKey = buildPlaylistStorageKey(handwritingDocumentId, selectedYoutubeEmbed.shapeId)
+				const lastOpenedKey = buildPlaylistLastOpenedStorageKey(
+					handwritingDocumentId,
+					selectedYoutubeEmbed.shapeId
+				)
+				const lastOpenedUrl = window.localStorage.getItem(lastOpenedKey) ?? undefined
+
+				window.localStorage.setItem(storageKey, JSON.stringify(uniqueEntries))
+				setPlaylistEntriesByShapeId((current) => ({
+					...current,
+					[selectedYoutubeEmbed.shapeId]: uniqueEntries,
+				}))
+
+				const preferredUrl =
+					lastOpenedUrl && uniqueEntries.some((entry) => entry.url === lastOpenedUrl)
+						? lastOpenedUrl
+						: uniqueEntries[0]?.url
+				if (preferredUrl) {
+					updateYoutubeEmbedVideo(preferredUrl)
+				}
+				setPlaylistStatus(
+					uniqueEntries.length > 0
+						? `Loaded ${uniqueEntries.length} videos from playlist ${result.playlistId}.`
+						: 'Playlist loaded, but no videos were found.'
+				)
+			} catch (error) {
+				console.error('[YouTube playlist] import failed', error)
+				setPlaylistStatus(`Could not load playlist: ${String(error)}`)
+			}
+			setPlaylistLoading(false)
+		},
+		[handwritingDocumentId, selectedYoutubeEmbed, updateYoutubeEmbedVideo]
+	)
+
+	const refreshSelectedPlaylist = React.useCallback(() => {
+		if (!selectedYoutubeEmbed) return
+		void importYoutubePlaylistFromUrl(playlistUrlInput || selectedYoutubeEmbed.url)
+	}, [importYoutubePlaylistFromUrl, playlistUrlInput, selectedYoutubeEmbed])
+
+	const selectedYoutubeIds = React.useMemo(() => {
+		if (!selectedYoutubeEmbed) return {}
+		return parseYoutubeIds(selectedYoutubeEmbed.url)
+	}, [selectedYoutubeEmbed])
 
 	const loadPlaylistFromInput = React.useCallback(() => {
 		if (!selectedYoutubeEmbed) return
@@ -1074,18 +1241,41 @@ const TldrawApp = ({
 		if (lines.length === 0) return
 
 		const unique = Array.from(new Set(lines))
+		const entries: YoutubePlaylistEntry[] = unique.map((url) => ({ url }))
 		const storageKey = buildPlaylistStorageKey(handwritingDocumentId, selectedYoutubeEmbed.shapeId)
-		window.localStorage.setItem(storageKey, JSON.stringify(unique))
+		const lastOpenedKey = buildPlaylistLastOpenedStorageKey(handwritingDocumentId, selectedYoutubeEmbed.shapeId)
+		const lastOpenedUrl = window.localStorage.getItem(lastOpenedKey) ?? undefined
+		window.localStorage.setItem(storageKey, JSON.stringify(entries))
 
 		setPlaylistEntriesByShapeId((current) => ({
 			...current,
-			[selectedYoutubeEmbed.shapeId]: unique,
+			[selectedYoutubeEmbed.shapeId]: entries,
 		}))
 
-		if (unique[0]) {
-			updateYoutubeEmbedVideo(unique[0])
+		const preferredUrl = lastOpenedUrl && unique.includes(lastOpenedUrl) ? lastOpenedUrl : unique[0]
+		if (preferredUrl) {
+			updateYoutubeEmbedVideo(preferredUrl)
 		}
 	}, [handwritingDocumentId, playlistInput, selectedYoutubeEmbed, updateYoutubeEmbedVideo])
+
+	React.useEffect(() => {
+		if (!selectedYoutubeEmbed) return
+		const existingEntries = playlistEntriesByShapeId[selectedYoutubeEmbed.shapeId]
+		if (existingEntries && existingEntries.length > 0) return
+
+		const playlistId = getYoutubePlaylistIdFromUrl(selectedYoutubeEmbed.url)
+		if (!playlistId) return
+
+		const autoImportKey = `${selectedYoutubeEmbed.shapeId}:${selectedYoutubeEmbed.url}`
+		if (playlistAutoImportKeyRef.current === autoImportKey) return
+		playlistAutoImportKeyRef.current = autoImportKey
+
+		void importYoutubePlaylistFromUrl(selectedYoutubeEmbed.url)
+	}, [
+		importYoutubePlaylistFromUrl,
+		playlistEntriesByShapeId,
+		selectedYoutubeEmbed,
+	])
 
 	const onnxModelConfig = React.useMemo(() => {
 		return resolveOnlineHtrModelConfig(userSettings.handwritingRecognition)
@@ -3481,35 +3671,114 @@ const TldrawApp = ({
 							Close
 						</button>
 					</div>
-					<textarea
+					<input
 						className="ptl-youtube-playlist-input"
-						placeholder="Paste YouTube URLs or video IDs, one per line"
+						type="text"
+						placeholder="Paste YouTube playlist URL"
+						value={playlistUrlInput}
+						onChange={(event) => setPlaylistUrlInput(event.currentTarget.value)}
+					/>
+					<div className="ptl-youtube-playlist-actions">
+						<button
+							type="button"
+							className="ptl-handwriting-search-nav-button"
+							onClick={refreshSelectedPlaylist}
+							disabled={playlistLoading}
+						>
+							{playlistLoading ? 'Loading…' : 'Import Playlist'}
+						</button>
+					</div>
+					{playlistStatus ? <div className="ptl-youtube-playlist-status">{playlistStatus}</div> : null}
+					<textarea
+						className="ptl-youtube-playlist-manual-input"
+						placeholder="Manual fallback: paste video URLs or IDs, one per line"
 						value={playlistInput}
 						onChange={(event) => setPlaylistInput(event.currentTarget.value)}
 					/>
 					<div className="ptl-youtube-playlist-actions">
-						<button type="button" className="ptl-handwriting-search-nav-button" onClick={loadPlaylistFromInput}>
-							Load Videos
+						<button
+							type="button"
+							className="ptl-handwriting-search-nav-button"
+							onClick={loadPlaylistFromInput}
+							disabled={playlistLoading}
+						>
+							Load Manual List
 						</button>
 					</div>
 					<div className="ptl-youtube-playlist-videos">
 						{(playlistEntriesByShapeId[selectedYoutubeEmbed.shapeId] ?? []).map((entry, index) => {
-							const ids = parseYoutubeIds(entry)
-							const label = ids.videoId ? `${index + 1}. ${ids.videoId}` : `${index + 1}. Video`
+							const ids = parseYoutubeIds(entry.url)
+							const label = entry.title?.trim() || ids.videoId || 'Video'
+							const isActive = !!ids.videoId && ids.videoId === selectedYoutubeIds.videoId
+							const thumbnailUrl = buildYoutubeThumbnailUrl(ids.videoId)
+							const showHoverPreview = () => {
+								if (!thumbnailUrl) return
+								setPlaylistHoverPreview((current) => ({
+									title: `${index + 1}. ${label}`,
+									thumbnailUrl,
+									left: current?.left ?? 0,
+									top: current?.top ?? 0,
+								}))
+							}
+							const updateHoverPreviewPosition = (event: React.MouseEvent<HTMLButtonElement>) => {
+								if (!thumbnailUrl) return
+								const previewWidth = 230
+								const previewHeight = 170
+								const gap = 12
+								const viewportPadding = 8
+
+								let nextLeft = event.clientX + gap
+								if (nextLeft + previewWidth > window.innerWidth - viewportPadding) {
+									nextLeft = event.clientX - previewWidth - gap
+								}
+								nextLeft = Math.max(viewportPadding, nextLeft)
+
+								const nextTop = Math.max(
+									viewportPadding,
+									Math.min(event.clientY + gap, window.innerHeight - previewHeight - viewportPadding)
+								)
+								setPlaylistHoverPreview((current) =>
+									current
+										? {
+											...current,
+											left: nextLeft,
+											top: nextTop,
+									  }
+										: {
+											title: `${index + 1}. ${label}`,
+											thumbnailUrl,
+											left: nextLeft,
+											top: nextTop,
+									  }
+								)
+							}
 							return (
 								<button
 									type="button"
-									key={`${entry}-${index}`}
-									className="ptl-youtube-playlist-video"
-									onClick={() => updateYoutubeEmbedVideo(entry)}
+									key={`${entry.url}-${index}`}
+									className={`ptl-youtube-playlist-video${isActive ? ' is-active' : ''}`}
+									aria-pressed={isActive}
+									onClick={() => {
+										setPlaylistHoverPreview(null)
+										updateYoutubeEmbedVideo(entry.url)
+									}}
+									onMouseEnter={(event) => {
+										showHoverPreview()
+										updateHoverPreviewPosition(event)
+									}}
+									onMouseMove={updateHoverPreviewPosition}
+									onMouseLeave={() => setPlaylistHoverPreview(null)}
 								>
-									<span className="ptl-youtube-playlist-video-label">{label}</span>
+									<span className="ptl-youtube-playlist-video-label">
+										{index + 1}. {label}
+									</span>
 								</button>
 							)
 						})}
 					</div>
 				</div>
 			) : null}
+			{playlistHoverPreviewOverlay}
 			<Tldraw // This component is responsible for rendering the canvas.
 				{...storeProps}
 				assetUrls={assetUrls.current}
