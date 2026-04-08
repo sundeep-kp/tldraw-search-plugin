@@ -2946,7 +2946,6 @@ const TldrawApp = ({
 		forceVisibleSelectedDrawDiagnostic,
 		hasSelectedKritaPreset,
 		hasSelectedDrawShape,
-		isCameraMoving,
 		pencilBaseStrokeEnabled,
 		pencilDefaultStrokeEnabled,
 		pencilFallbackStylingEnabled,
