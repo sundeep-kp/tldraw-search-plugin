@@ -121,7 +121,7 @@ function sampleNoise2d(x: number, y: number): number {
 }
 
 export function applyGrainToDab(
-	ctx: CanvasRenderingContext2D,
+	ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
 	x: number,
 	y: number,
 	size: number,

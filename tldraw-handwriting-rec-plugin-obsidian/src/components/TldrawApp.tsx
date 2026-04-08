@@ -93,6 +93,7 @@ import {
 	TldrawUiSlider,
 	TLStateNodeConstructor,
 	TLStoreSnapshot,
+	type TLDefaultSizeStyle,
 	type TLDrawShape,
 	type TLEmbedShape,
 	type TLShapeId,
@@ -110,6 +111,8 @@ import {
 	useTools,
 } from 'tldraw'
 import {
+	PENCIL_SHAPE_UTILS,
+	activeStampShapeModeRef,
 	setPencilBaseStrokeEnabled,
 	setPencilDefaultStrokeEnabled,
 	setPencilFallbackStylingEnabled,
@@ -126,6 +129,12 @@ import {
 	getYoutubePlaylistIdFromUrl,
 } from 'src/obsidian/youtube/playlist-extractor'
 import { generateFallbackTip } from 'src/obsidian/krita/fallback-tips'
+
+const console = {
+	log: (..._args: unknown[]) => {},
+	warn: globalThis.console.warn.bind(globalThis.console),
+	error: globalThis.console.error.bind(globalThis.console),
+}
 
 type TldrawAppOptions = {
 	iconAssetUrls?: TLUiAssetUrlOverrides['icons']
@@ -991,6 +1000,7 @@ const TldrawApp = ({
 		components: otherComponents,
 		focusOnMount = true,
 		hideUi = false,
+		shapeUtils = PENCIL_SHAPE_UTILS,
 		iconAssetUrls,
 		initialTool,
 		isReadonly = false,
@@ -1049,6 +1059,7 @@ const TldrawApp = ({
 	)
 
 	const [isFocused, setIsFocused] = React.useState(false)
+	const [isCameraMoving, setIsCameraMoving] = React.useState(false)
 	const [overlayRenderTick, setOverlayRenderTick] = React.useState(0)
 	const [isSearchPanelOpen, setIsSearchPanelOpen] = React.useState(false)
 	const [isPlaylistPanelOpen, setIsPlaylistPanelOpen] = React.useState(false)
@@ -1118,6 +1129,9 @@ const TldrawApp = ({
 	const isDrawingRef = React.useRef(false)
 	const activePointerIdRef = React.useRef<number | null>(null)
 	const saveTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+	const cameraMotionTimerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+	const isCameraMovingRef = React.useRef(false)
+	const lastCameraRef = React.useRef<{ x: number; y: number; z: number } | null>(null)
 	const suppressScrubArtifactUntilRef = React.useRef(0)
 	const scrubCanceledShapeIdsRef = React.useRef(new Set<string>())
 	const bootstrappedRecognitionByDocumentRef = React.useRef(new Set<string>())
@@ -1126,6 +1140,7 @@ const TldrawApp = ({
 	>(null)
 	const playlistAutoImportKeyRef = React.useRef<string | null>(null)
 	const youtubeIframeRef = React.useRef<HTMLIFrameElement | null>(null)
+	const enableCanvasRasterPipeline = false
 	const handwritingDocumentId = React.useMemo(() => {
 		if (store && 'plugin' in store && store.plugin) {
 			return store.plugin.meta.uuid
@@ -1581,10 +1596,9 @@ const TldrawApp = ({
 		]
 	)
 
-	// Sync active brush tip to module-level ref for use by pencil renderer
-	React.useEffect(() => {
-		activeBrushTipRef.current = activeBrushTip.current
-	}, [activeBrushTip])
+	// Keep renderer-facing refs in sync for draw-shape stamping.
+	activeBrushTipRef.current = activeBrushTip.current
+	activeStampShapeModeRef.current = activeStampShapeMode.current
 
 	const clearCanvas = React.useCallback((canvas: HTMLCanvasElement) => {
 		const ctx = canvas.getContext('2d')
@@ -1736,6 +1750,7 @@ const TldrawApp = ({
 
 	const onCanvasPointerDownCapture = React.useCallback(
 		(e: React.PointerEvent<HTMLDivElement>) => {
+			if (!enableCanvasRasterPipeline) return
 			if (!editor) return
 			if (editor.getCurrentToolId() !== 'pencil') return
 			if (!activeBrushProfile.current) return
@@ -1765,11 +1780,12 @@ const TldrawApp = ({
 			lastTimestampRef.current = e.timeStamp
 			remainderDistRef.current = 0
 		},
-		[clearCanvas, editor, toWorldPoint]
+		[clearCanvas, editor, enableCanvasRasterPipeline, toWorldPoint]
 	)
 
 	const onCanvasPointerMoveCapture = React.useCallback(
 		(e: React.PointerEvent<HTMLDivElement>) => {
+			if (!enableCanvasRasterPipeline) return
 			if (!editor) return
 			if (editor.getCurrentToolId() !== 'pencil') return
 			if (!isDrawingRef.current || activePointerIdRef.current !== e.pointerId) return
@@ -1817,11 +1833,12 @@ const TldrawApp = ({
 			lastPressureRef.current = p
 			lastTimestampRef.current = e.timeStamp
 		},
-		[editor, stampDab, toWorldPoint]
+		[editor, enableCanvasRasterPipeline, stampDab, toWorldPoint]
 	)
 
 	const onCanvasPointerUpCapture = React.useCallback(
 		(e: React.PointerEvent<HTMLDivElement>) => {
+			if (!enableCanvasRasterPipeline) return
 			if (!editor) return
 			if (editor.getCurrentToolId() !== 'pencil') return
 			const shouldRelease = e.currentTarget.hasPointerCapture?.(e.pointerId)
@@ -1860,10 +1877,11 @@ const TldrawApp = ({
 			// Keep draw-shape opacity unchanged so strokes remain visible.
 			// Hiding vector strokes here can make "registered but invisible" behavior.
 		},
-		[clearCanvas, editor, scheduleCommittedCanvasSave]
+		[clearCanvas, editor, enableCanvasRasterPipeline, scheduleCommittedCanvasSave]
 	)
 
 	const onCanvasPointerCancelCapture = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+		if (!enableCanvasRasterPipeline) return
 		if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
 			e.currentTarget.releasePointerCapture(e.pointerId)
 		}
@@ -1871,7 +1889,7 @@ const TldrawApp = ({
 			isDrawingRef.current = false
 			activePointerIdRef.current = null
 		}
-	}, [])
+	}, [enableCanvasRasterPipeline])
 
 	const createCenterInkyRectangleStroke = React.useCallback(() => {
 		if (!editor) return
@@ -1965,89 +1983,14 @@ const TldrawApp = ({
 				ptlDebugShape: 'raw-geo-rect',
 			},
 		} as never)
-
-		console.log('[KritaBrush] created center raw geo rectangle', {
-			centerX: center.x,
-			centerY: center.y,
-			width,
-			height,
-		})
 	}, [editor])
 
 	React.useEffect(() => {
-		const container = editorContainerRef.current
-		if (!container) return
-
-		let disposed = false
-		let resizeInFlight = false
-		let needsAnotherPass = false
-
-		const resizeCanvases = async () => {
-			if (resizeInFlight) {
-				needsAnotherPass = true
-				return
-			}
-
-			resizeInFlight = true
-			do {
-				needsAnotherPass = false
-				if (disposed) break
-
-				const committedCanvas = committedCanvasRef.current
-				const activeCanvas = activeCanvasRef.current
-				if (!committedCanvas || !activeCanvas) break
-
-				const cssWidth = Math.max(1, container.offsetWidth)
-				const cssHeight = Math.max(1, container.offsetHeight)
-				const dpr = window.devicePixelRatio || 1
-				const pixelWidth = Math.max(1, Math.floor(cssWidth * dpr))
-				const pixelHeight = Math.max(1, Math.floor(cssHeight * dpr))
-
-				let snapshot: ImageBitmap | null = null
-				if (committedCanvas.width > 0 && committedCanvas.height > 0) {
-					try {
-						snapshot = await createImageBitmap(committedCanvas)
-					} catch {
-						snapshot = null
-					}
-				}
-
-				for (const canvas of [committedCanvas, activeCanvas]) {
-					canvas.width = pixelWidth
-					canvas.height = pixelHeight
-					const ctx = canvas.getContext('2d')
-					if (!ctx) continue
-					ctx.setTransform(1, 0, 0, 1, 0, 0)
-					ctx.clearRect(0, 0, canvas.width, canvas.height)
-					ctx.scale(dpr, dpr)
-				}
-
-				if (snapshot) {
-					const committedCtx = committedCanvas.getContext('2d')
-					if (committedCtx) {
-						committedCtx.drawImage(snapshot, 0, 0, cssWidth, cssHeight)
-					}
-					snapshot.close()
-				}
-			} while (needsAnotherPass && !disposed)
-
-			resizeInFlight = false
-		}
-
-		const observer = new ResizeObserver(() => {
-			void resizeCanvases()
-		})
-
-		observer.observe(container)
-		void resizeCanvases()
-
-		return () => {
-			disposed = true
-			observer.disconnect()
-		}
-	}, [])
+		if (!enableCanvasRasterPipeline) return
+	}, [enableCanvasRasterPipeline])
 
 	React.useEffect(() => {
+		if (!enableCanvasRasterPipeline) return
 		if (!editor) return
 
 		const applyCameraTransform = () => {
@@ -2065,9 +2008,10 @@ const TldrawApp = ({
 		return () => {
 			editor.off('change', applyCameraTransform)
 		}
-	}, [editor])
+	}, [editor, enableCanvasRasterPipeline])
 
 	React.useEffect(() => {
+		if (!enableCanvasRasterPipeline) return
 		let disposed = false
 
 		const restoreSidecar = async () => {
@@ -2089,13 +2033,7 @@ const TldrawApp = ({
 				const bytes = await plugin.app.vault.adapter.readBinary(path)
 				if (disposed) return
 				const mimeType = path.endsWith('.jpg') ? 'image/jpeg' : 'image/png'
-				const blob = new Blob([bytes], { type: mimeType })
-				const bitmap = await createImageBitmap(blob)
-				if (disposed) {
-					bitmap.close()
-					return
-				}
-
+				const bitmap = await createImageBitmap(new Blob([bytes], { type: mimeType }))
 				const ctx = canvas.getContext('2d')
 				if (ctx) {
 					const dpr = window.devicePixelRatio || 1
@@ -2114,7 +2052,7 @@ const TldrawApp = ({
 		return () => {
 			disposed = true
 		}
-	}, [editor, getCurrentCanvasMarkdownPath, handwritingDocumentId, plugin])
+	}, [editor, enableCanvasRasterPipeline, getCurrentCanvasMarkdownPath, handwritingDocumentId, plugin])
 
 	React.useEffect(() => {
 		if (!editor) return
@@ -2883,6 +2821,52 @@ const TldrawApp = ({
 		setPencilCrossSectionAspectRatio(pencilCrossSectionAspectRatio)
 	}, [pencilCrossSectionAspectRatio])
 
+	React.useEffect(() => {
+		if (!editor) return
+
+		const markCameraMoving = () => {
+			if (!isCameraMovingRef.current) {
+				isCameraMovingRef.current = true
+				setIsCameraMoving(true)
+			}
+			if (cameraMotionTimerRef.current) {
+				clearTimeout(cameraMotionTimerRef.current)
+			}
+			cameraMotionTimerRef.current = setTimeout(() => {
+				isCameraMovingRef.current = false
+				setIsCameraMoving(false)
+				cameraMotionTimerRef.current = undefined
+			}, 140)
+		}
+
+		const onEditorChange = () => {
+			const cam = editor.getCamera()
+			const last = lastCameraRef.current
+			if (!last) {
+				lastCameraRef.current = { x: cam.x, y: cam.y, z: cam.z }
+				return
+			}
+
+			if (cam.x !== last.x || cam.y !== last.y || cam.z !== last.z) {
+				lastCameraRef.current = { x: cam.x, y: cam.y, z: cam.z }
+				markCameraMoving()
+			}
+		}
+
+		onEditorChange()
+		editor.on('change', onEditorChange)
+
+		return () => {
+			editor.off('change', onEditorChange)
+			if (cameraMotionTimerRef.current) {
+				clearTimeout(cameraMotionTimerRef.current)
+				cameraMotionTimerRef.current = undefined
+			}
+			isCameraMovingRef.current = false
+			setIsCameraMoving(false)
+		}
+	}, [editor])
+
 	const pencilDefaultStrokeEnabled = userSettings.debugLogs?.pencilDefaultStroke ?? true
 	const pencilBaseStrokeEnabled = userSettings.debugLogs?.pencilBaseStroke ?? true
 	const pencilSampledOverlayEnabled = userSettings.debugLogs?.pencilSampledOverlay ?? true
@@ -2899,7 +2883,7 @@ const TldrawApp = ({
 		},
 		[editor]
 	)
-	const forceVisibleSelectedDrawDiagnostic = hasSelectedDrawShape
+	const forceVisibleSelectedDrawDiagnostic = false
 
 	// Force tldraw to invalidate render cache when renderer settings change
 	const invalidateDrawShapeCache = React.useCallback(() => {
@@ -2923,22 +2907,30 @@ const TldrawApp = ({
 	}, [editor])
 
 	React.useEffect(() => {
-		const effectiveDefaultStrokeEnabled = forceVisibleSelectedDrawDiagnostic
+		const effectiveDefaultStrokeEnabled = isCameraMoving
+			? true
+			: forceVisibleSelectedDrawDiagnostic
 			? true
 			: useKritaRasterPipeline
 				? false
 				: pencilDefaultStrokeEnabled
-		const effectiveBaseStrokeEnabled = forceVisibleSelectedDrawDiagnostic
+		const effectiveBaseStrokeEnabled = isCameraMoving
+			? true
+			: forceVisibleSelectedDrawDiagnostic
 			? true
 			: useKritaRasterPipeline
 				? false
 				: pencilBaseStrokeEnabled
-		const effectiveSampledOverlayEnabled = forceVisibleSelectedDrawDiagnostic
+		const effectiveSampledOverlayEnabled = isCameraMoving
+			? false
+			: forceVisibleSelectedDrawDiagnostic
 			? false
 			: useKritaRasterPipeline
 				? true
 				: pencilSampledOverlayEnabled
-		const effectiveFallbackStylingEnabled = forceVisibleSelectedDrawDiagnostic
+		const effectiveFallbackStylingEnabled = isCameraMoving
+			? false
+			: forceVisibleSelectedDrawDiagnostic
 			? true
 			: useKritaRasterPipeline
 				? false
@@ -2948,33 +2940,20 @@ const TldrawApp = ({
 		setPencilBaseStrokeEnabled(effectiveBaseStrokeEnabled)
 		setPencilSampledOverlayEnabled(effectiveSampledOverlayEnabled)
 		setPencilFallbackStylingEnabled(effectiveFallbackStylingEnabled)
-		// Apply all renderer toggles first, then invalidate once.
-		console.log('[TldrawApp] Pencil renderer toggles updated', {
-			forceVisibleSelectedDrawDiagnostic,
-			hasSelectedDrawShape,
-			useKritaRasterPipeline,
-			pencilDefaultStrokeEnabled,
-			pencilBaseStrokeEnabled,
-			pencilSampledOverlayEnabled,
-			pencilFallbackStylingEnabled,
-			effectiveDefaultStrokeEnabled,
-			effectiveBaseStrokeEnabled,
-			effectiveSampledOverlayEnabled,
-			effectiveFallbackStylingEnabled,
-		})
-		console.log('[TldrawApp] Pencil fallback styling toggled:', effectiveFallbackStylingEnabled)
 		invalidateDrawShapeCache()
 	}, [
 		activeStampShapeModeState,
 		forceVisibleSelectedDrawDiagnostic,
 		hasSelectedKritaPreset,
 		hasSelectedDrawShape,
+		isCameraMoving,
 		pencilBaseStrokeEnabled,
 		pencilDefaultStrokeEnabled,
 		pencilFallbackStylingEnabled,
 		useKritaRasterPipeline,
 		pencilSampledOverlayEnabled,
 		runtimeSelectedPresetId,
+		userSettings.debugMode,
 		invalidateDrawShapeCache,
 	])
 
@@ -3077,17 +3056,6 @@ const TldrawApp = ({
 			loadModelBytes,
 		})
 		recognitionRunVersionRef.current += 1
-
-		if (userSettings.debugMode && userSettings.debugLogs?.recognitionEngine) {
-			console.log('[handwriting] recognizer engine selected', {
-				documentId: handwritingDocumentId,
-				backendPreference: userSettings.handwritingRecognition?.backend ?? 'auto',
-				engine: recognizerEngine,
-				hasModelUrl: onnxModelConfig.modelUrl.length > 0,
-				hasAlphabet: onnxModelConfig.alphabet.length > 0,
-				googleImeLanguage: googleImeConfig.language,
-			})
-		}
 
 		void previousRecognizer.dispose()
 	}, [
@@ -3222,10 +3190,6 @@ const TldrawApp = ({
 							}
 						}
 
-						const debugPreparedSample = userSettings.debugMode
-							? preprocessGroupForOnlineHtr(candidate)
-							: null
-
 						const fingerprint = buildGroupFingerprint(candidate)
 						const existing = getRecognitionResult(handwritingDocumentId, candidate.id)
 						const existingByFingerprint = getRecognitionResultByFingerprint(
@@ -3259,12 +3223,6 @@ const TldrawApp = ({
 						try {
 							const recognitionCandidates = await recognizerRef.current.recognize(candidate)
 							if (runVersion !== recognitionRunVersionRef.current) {
-								if (userSettings.debugMode && userSettings.debugLogs?.recognitionEvents) {
-									console.log('[handwriting] stale recognition result skipped', {
-										documentId: handwritingDocumentId,
-										groupId: candidate.id,
-									})
-								}
 								return
 							}
 
@@ -3279,38 +3237,8 @@ const TldrawApp = ({
 							})
 							setOverlayRenderTick((tick) => tick + 1)
 
-							if (userSettings.debugMode && userSettings.debugLogs?.recognitionEvents) {
-								console.log('[handwriting] recognition success', {
-									documentId: handwritingDocumentId,
-									groupId: candidate.id,
-									bestText: recognitionCandidates[0]?.text ?? '',
-									bestConfidence: recognitionCandidates[0]?.confidence ?? 0,
-									candidateCount: recognitionCandidates.length,
-								})
-
-								if (debugPreparedSample) {
-									console.log('[handwriting] recognition parity sample', {
-										documentId: handwritingDocumentId,
-										groupId: candidate.id,
-										shapeIds: candidate.shapeIds,
-										prediction: recognitionCandidates[0]?.text ?? '',
-										confidence: recognitionCandidates[0]?.confidence ?? 0,
-										timeSteps: debugPreparedSample.timeSteps,
-										channels: debugPreparedSample.channels,
-										ink: Array.from(debugPreparedSample.ink),
-									})
-								}
-							}
 							recognizedCount += 1
 						} catch (error) {
-							if (userSettings.debugMode && userSettings.debugLogs?.recognitionEvents) {
-								console.error('[handwriting] recognition failed', {
-									documentId: handwritingDocumentId,
-									groupId: candidate.id,
-									error: error instanceof Error ? error.message : String(error),
-								})
-							}
-
 							upsertRecognitionResult(handwritingDocumentId, {
 								groupId: candidate.id,
 								shapeIds: candidate.shapeIds,
@@ -3325,26 +3253,6 @@ const TldrawApp = ({
 						}
 					}
 
-					if (userSettings.debugMode && userSettings.debugLogs?.recognitionEvents) {
-						const recognizedPreview = getDocumentRecognitionResults(handwritingDocumentId)
-							.filter((result) => result.status === 'success')
-							.map((result) => ({
-								groupId: result.groupId,
-								text: result.candidates[0]?.text ?? '',
-								confidence: result.candidates[0]?.confidence ?? 0,
-							}))
-
-						console.log('[handwriting] recognition run complete', {
-							documentId: handwritingDocumentId,
-							queuedCandidates: candidates.length,
-							recognizedCandidates: recognizedCount,
-							deferredCandidates: deferredCount,
-							totalStoredResults: getDocumentRecognitionResults(handwritingDocumentId).length,
-							latencyMs: Date.now() - runStartedAt,
-							recognizedPreview,
-						})
-					}
-
 					if (
 						deferredCount > 0 &&
 						runVersion === recognitionRunVersionRef.current &&
@@ -3355,14 +3263,6 @@ const TldrawApp = ({
 							scheduleRecognition(candidates, options)
 						}, retryDelayMs)
 
-						if (userSettings.debugMode && userSettings.debugLogs?.recognitionEvents) {
-							console.log('[handwriting] recognition deferred for fresh groups', {
-								documentId: handwritingDocumentId,
-								deferredCandidates: deferredCount,
-								retryDelayMs,
-								holdoffMs,
-							})
-						}
 					}
 				})()
 			}, recognitionDebounceMs)
@@ -5080,24 +4980,28 @@ const TldrawApp = ({
 					setFocusedEditor(false, editor)
 				}}
 			>
-				<canvas
-					ref={committedCanvasRef}
-					style={{
-						position: 'absolute',
-						inset: 0,
-						pointerEvents: 'none',
-						zIndex: 10,
-					}}
-				/>
-				<canvas
-					ref={activeCanvasRef}
-					style={{
-						position: 'absolute',
-						inset: 0,
-						pointerEvents: 'none',
-						zIndex: 11,
-					}}
-				/>
+				{enableCanvasRasterPipeline ? (
+					<>
+						<canvas
+							ref={committedCanvasRef}
+							style={{
+								position: 'absolute',
+								inset: 0,
+								pointerEvents: 'none',
+								zIndex: 10,
+							}}
+						/>
+						<canvas
+							ref={activeCanvasRef}
+							style={{
+								position: 'absolute',
+								inset: 0,
+								pointerEvents: 'none',
+								zIndex: 11,
+							}}
+						/>
+					</>
+				) : null}
 			{anchorStickerOverlays.map((overlay) => (
 				<button
 					type="button"
@@ -5611,6 +5515,7 @@ const TldrawApp = ({
 				onMount={(editor) => {
 					setAppState(editor) //setAppState is the function that stores the editor instance inside the plugin's internal state.
 				}}
+				shapeUtils={shapeUtils}
 				tools={tools}
 				className={fbWorkAroundClassname}
 			/>

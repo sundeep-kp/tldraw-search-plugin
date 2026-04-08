@@ -6,12 +6,14 @@ type BrushProfileLike = {
 	pencilTextureIntensity?: number
 }
 
+type Canvas2dContext = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
+
 function clamp(value: number, min: number, max: number): number {
 	return Math.max(min, Math.min(max, value))
 }
 
 function drawSoftEllipse(
-	ctx: CanvasRenderingContext2D,
+	ctx: Canvas2dContext,
 	size: number,
 	aspectRatio: number,
 	alpha: number
@@ -33,7 +35,7 @@ function drawSoftEllipse(
 	ctx.restore()
 }
 
-function drawHardRoundTip(ctx: CanvasRenderingContext2D, size: number, alpha: number): void {
+function drawHardRoundTip(ctx: Canvas2dContext, size: number, alpha: number): void {
 	const cx = size / 2
 	const cy = size / 2
 	const r = size * 0.42
@@ -43,7 +45,7 @@ function drawHardRoundTip(ctx: CanvasRenderingContext2D, size: number, alpha: nu
 	ctx.fill()
 }
 
-function drawRadialCircle(ctx: CanvasRenderingContext2D, size: number): void {
+function drawRadialCircle(ctx: Canvas2dContext, size: number): void {
 	const cx = size / 2
 	const cy = size / 2
 	const r = size * 0.45

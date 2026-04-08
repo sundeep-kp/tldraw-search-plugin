@@ -15,6 +15,10 @@ export const PENCIL_FEATHER_FILTER_ID = 'pencil-feather-filter'
  * Set by TldrawApp to make the brush context accessible to the renderer.
  */
 export const activeBrushTipRef: React.MutableRefObject<ImageBitmap | null> = { current: null }
+export type StampShapeMode = 'auto' | 'circle' | 'rectangle'
+export const activeStampShapeModeRef: React.MutableRefObject<StampShapeMode> = {
+	current: 'auto',
+}
 
 /**
  * Cache for ImageBitmap -> data URL conversions to avoid repeated rendering.
@@ -67,24 +71,18 @@ export function setPencilCrossSectionAspectRatio(value: number) {
 }
 
 export function setPencilBaseStrokeEnabled(value: boolean) {
-	console.log('[Pencil Renderer] Base stroke enabled:', value)
 	pencilBaseStrokeEnabled = value
 }
 
 export function setPencilSampledOverlayEnabled(value: boolean) {
-	console.log('[Pencil Renderer] Sampled overlay enabled:', value)
 	pencilSampledOverlayEnabled = value
 }
 
 export function setPencilFallbackStylingEnabled(value: boolean) {
-	console.log('[Pencil Renderer] Fallback styling enabled:', value)
 	pencilFallbackStylingEnabled = value
 }
 
 export function setPencilDefaultStrokeEnabled(value: boolean) {
-	const changed = pencilDefaultStrokeEnabled !== value
-	console.log('[Pencil Renderer] Default stroke enabled:', value, '(changed:', changed, ')')
-	if (changed) console.log('[Pencil Renderer] ⚠️ Module variable updated - tldraw cache may not invalidate')
 	pencilDefaultStrokeEnabled = value
 }
 
@@ -232,28 +230,45 @@ function getPencilShapeStyle(shape: TLDrawShape): React.CSSProperties | undefine
 	}
 }
 
+function wrapForHtmlRender(node: React.ReactNode): React.ReactNode {
+	if (!node) return node
+	return (
+		<svg pointerEvents="none" style={{ overflow: 'visible' }}>
+			{node}
+		</svg>
+	)
+}
+
 function buildPressureSampledRibbonStroke(shape: TLDrawShape, baseElement: React.ReactNode) {
 	const localPressurePoints = getLocalPressurePointsFromShape(shape)
 	if (localPressurePoints.length < 2) return null
 
 	const basePath = findFirstPathElement(baseElement)
-	if (!basePath) return null
 
 	const strokeColor =
-		typeof basePath.props.stroke === 'string'
+		basePath && typeof basePath.props.stroke === 'string'
 			? basePath.props.stroke
-			: typeof basePath.props.fill === 'string' && basePath.props.fill !== 'none'
+			: basePath && typeof basePath.props.fill === 'string' && basePath.props.fill !== 'none'
 				? basePath.props.fill
-				: undefined
-	if (!strokeColor) return null
+				: '#000000'
 
 	const strokeWidth =
-		typeof basePath.props.strokeWidth === 'number'
+		basePath && typeof basePath.props.strokeWidth === 'number'
 			? basePath.props.strokeWidth
 			: ((STROKE_SIZE_BY_STYLE[shape.props.size] ?? STROKE_SIZE_BY_STYLE.m) + 1) * shape.props.scale
 
 	const paths: React.ReactNode[] = []
-	const maxSampleLength = Math.max(2.2, strokeWidth * 1.1)
+	// Performance: sample fewer dabs per segment to keep stroke rendering responsive.
+	const maxSampleLength = Math.max(4.5, strokeWidth * 2.4)
+	const stampShapeMode = activeStampShapeModeRef.current
+
+	if (stampShapeMode === 'circle') {
+		return buildCircleStampStroke(localPressurePoints, strokeColor, strokeWidth, maxSampleLength, shape.id)
+	}
+
+	if (stampShapeMode === 'rectangle') {
+		return buildRectangleStampStroke(localPressurePoints, strokeColor, strokeWidth, maxSampleLength, shape.id)
+	}
 
 	// Check if we should use a brush bitmap stamp instead of polygon rendering
 	const brushBitmap = activeBrushTipRef.current
@@ -283,10 +298,11 @@ function buildPressureSampledRibbonStroke(shape: TLDrawShape, baseElement: React
 
 			const segmentLength = distanceBetweenPoints(p1, p2)
 			const sampleCount = Math.max(1, Math.ceil(segmentLength / maxSampleLength))
+			const sampleStride = sampleCount > 20 ? 2 : 1
 
-			for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++) {
+			for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex += sampleStride) {
 				const startT = sampleIndex / sampleCount
-				const endT = (sampleIndex + 1) / sampleCount
+				const endT = Math.min(1, (sampleIndex + sampleStride) / sampleCount)
 				const startPoint = interpolatePressurePoint(p1, p2, startT)
 				const endPoint = interpolatePressurePoint(p1, p2, endT)
 				const segmentLength = distanceBetweenPoints(startPoint, endPoint)
@@ -339,6 +355,125 @@ function buildPressureSampledRibbonStroke(shape: TLDrawShape, baseElement: React
 	)
 }
 
+function buildCircleStampStroke(
+	localPressurePoints: LocalPressurePoint[],
+	strokeColor: string,
+	strokeWidth: number,
+	maxSampleLength: number,
+	shapeId: string
+): React.ReactNode {
+	const paths: React.ReactNode[] = []
+
+	for (let i = 0; i < localPressurePoints.length - 1; i++) {
+		const p1 = localPressurePoints[i]
+		const p2 = localPressurePoints[i + 1]
+		if (p1.x === p2.x && p1.y === p2.y) continue
+
+		const segmentLength = distanceBetweenPoints(p1, p2)
+		const sampleCount = Math.max(1, Math.ceil(segmentLength / maxSampleLength))
+		const sampleStride = sampleCount > 20 ? 2 : 1
+
+		for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex += sampleStride) {
+			const startT = sampleIndex / sampleCount
+			const endT = Math.min(1, (sampleIndex + sampleStride) / sampleCount)
+			const startPoint = interpolatePressurePoint(p1, p2, startT)
+			const endPoint = interpolatePressurePoint(p1, p2, endT)
+			const centerX = (startPoint.x + endPoint.x) / 2
+			const centerY = (startPoint.y + endPoint.y) / 2
+			const startOpacity = getPressureOpacityForPoint(startPoint.pressure)
+			const endOpacity = getPressureOpacityForPoint(endPoint.pressure)
+			const averagePressure = (startPoint.pressure + endPoint.pressure) / 2
+			const averageOpacity = (startOpacity + endOpacity) / 2
+			const sampledSize = strokeWidth * lerp(0.72, 0.96, averagePressure)
+			const baseRadius = Math.max(0.2, sampledSize / 2)
+			const layers = [
+				{ scale: 1.18, opacity: 0.12 },
+				{ scale: 0.92, opacity: 0.34 },
+				{ scale: 0.68, opacity: 0.58 },
+			]
+
+			for (const [layerIndex, layer] of layers.entries()) {
+				paths.push(
+					<circle
+						key={`${shapeId}-circle-stamp-${i}-${sampleIndex}-${layerIndex}`}
+						cx={centerX}
+						cy={centerY}
+						r={baseRadius * layer.scale}
+						fill={strokeColor}
+						fillOpacity={Math.max(0.04, Math.min(0.42, averageOpacity * layer.opacity))}
+					/>
+				)
+			}
+		}
+	}
+
+	if (paths.length === 0) return null
+
+	return <g pointerEvents="none">{paths}</g>
+}
+
+function buildRectangleStampStroke(
+	localPressurePoints: LocalPressurePoint[],
+	strokeColor: string,
+	strokeWidth: number,
+	maxSampleLength: number,
+	shapeId: string
+): React.ReactNode {
+	const paths: React.ReactNode[] = []
+
+	for (let i = 0; i < localPressurePoints.length - 1; i++) {
+		const p1 = localPressurePoints[i]
+		const p2 = localPressurePoints[i + 1]
+		if (p1.x === p2.x && p1.y === p2.y) continue
+
+		const segmentLength = distanceBetweenPoints(p1, p2)
+		const sampleCount = Math.max(1, Math.ceil(segmentLength / maxSampleLength))
+		const sampleStride = sampleCount > 20 ? 2 : 1
+
+		for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex += sampleStride) {
+			const startT = sampleIndex / sampleCount
+			const endT = Math.min(1, (sampleIndex + sampleStride) / sampleCount)
+			const startPoint = interpolatePressurePoint(p1, p2, startT)
+			const endPoint = interpolatePressurePoint(p1, p2, endT)
+			const segmentLen = distanceBetweenPoints(startPoint, endPoint)
+			if (segmentLen === 0) continue
+			const centerX = (startPoint.x + endPoint.x) / 2
+			const centerY = (startPoint.y + endPoint.y) / 2
+			const tangentX = (endPoint.x - startPoint.x) / segmentLen
+			const tangentY = (endPoint.y - startPoint.y) / segmentLen
+			const normalX = -tangentY
+			const normalY = tangentX
+			const startOpacity = getPressureOpacityForPoint(startPoint.pressure)
+			const endOpacity = getPressureOpacityForPoint(endPoint.pressure)
+			const averagePressure = (startPoint.pressure + endPoint.pressure) / 2
+			const averageOpacity = (startOpacity + endOpacity) / 2
+			const sampledSize = strokeWidth * lerp(0.72, 0.96, averagePressure)
+
+			paths.push(
+				<polygon
+					key={`${shapeId}-rect-stamp-${i}-${sampleIndex}`}
+					points={buildRectPoints(
+						centerX,
+						centerY,
+						tangentX,
+						tangentY,
+						normalX,
+						normalY,
+						sampledSize / 2,
+						sampledSize / 2
+					)}
+					fill={strokeColor}
+					fillOpacity={Math.max(0.045, Math.min(0.32, averageOpacity * 0.55))}
+				/>
+			)
+		}
+	}
+
+	if (paths.length === 0) return null
+
+	return <g pointerEvents="none">{paths}</g>
+}
+
 /**
  * Build polygon-based ribbon stroke (original implementation)
  */
@@ -358,10 +493,11 @@ function buildPolygonRibbonStroke(
 
 		const segmentLength = distanceBetweenPoints(p1, p2)
 		const sampleCount = Math.max(1, Math.ceil(segmentLength / maxSampleLength))
+		const sampleStride = sampleCount > 20 ? 2 : 1
 
-		for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++) {
+		for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex += sampleStride) {
 			const startT = sampleIndex / sampleCount
-			const endT = (sampleIndex + 1) / sampleCount
+			const endT = Math.min(1, (sampleIndex + sampleStride) / sampleCount)
 			const startPoint = interpolatePressurePoint(p1, p2, startT)
 			const endPoint = interpolatePressurePoint(p1, p2, endT)
 			const segmentLength = distanceBetweenPoints(startPoint, endPoint)
@@ -623,12 +759,6 @@ export class PencilDrawShapeUtil extends DrawShapeUtil {
 	}
 
 	override component(shape: TLDrawShape) {
-		console.log('[PencilDrawShapeUtil.component] rendering shape', {
-			shapeId: shape.id,
-			pencilDefaultStrokeEnabled,
-			pencilCrossSectionAspectRatio,
-			willRender: pencilDefaultStrokeEnabled ? 'full' : 'empty-g',
-		})
 		const element = super.component(shape)
 		if (this.shouldBypassRibbonForDebugShape(shape)) {
 			return element
@@ -636,14 +766,14 @@ export class PencilDrawShapeUtil extends DrawShapeUtil {
 		const ribbonStroke = buildPressureSampledRibbonStroke(shape, element)
 		// Never return an empty group for a valid draw shape; keep at least base element visible.
 		if (pencilCrossSectionAspectRatio !== 1 && ribbonStroke) {
-			return ribbonStroke
+			return wrapForHtmlRender(ribbonStroke)
 		}
 		if (ribbonStroke) {
 			return React.createElement(
 				React.Fragment,
 				null,
 				pencilBaseStrokeEnabled ? cloneElementWithOpacity(element, getAveragePressureOpacity(shape)) : null,
-				ribbonStroke
+				wrapForHtmlRender(ribbonStroke)
 			)
 		}
 		const style = getPencilShapeStyle(shape)
@@ -652,12 +782,6 @@ export class PencilDrawShapeUtil extends DrawShapeUtil {
 	}
 
 	override toSvg(shape: TLDrawShape, ctx: SvgExportContext) {
-		console.log('[PencilDrawShapeUtil.toSvg] exporting shape', {
-			shapeId: shape.id,
-			pencilDefaultStrokeEnabled,
-			pencilCrossSectionAspectRatio,
-			willRender: pencilDefaultStrokeEnabled ? 'full' : 'empty-g',
-		})
 		const element = super.toSvg(shape, ctx)
 		if (this.shouldBypassRibbonForDebugShape(shape)) {
 			return element

@@ -218,11 +218,7 @@ export abstract class BaseTldrawFileView<View extends FileView = FileView> {
 			},
 			tools: [PencilTool],
 			onEditorMount: (editor) => {
-				const viewState = this.fileView.getEphemeralState()
-				console.log(this.#deepLink)
-				console.log({ viewState })
 				if (this.#deepLink) {
-					console.log(this.#deepLink)
 					editor.navigateToDeepLink(this.#deepLink)
 					return
 				}
@@ -269,7 +265,6 @@ export abstract class BaseTldrawFileView<View extends FileView = FileView> {
 		}
 		this.registerOnUnloadFile(removeCb)
 		this.#unregisterViewAssetsActionCallback = () => {
-			console.log('unregisterViewAssetsActionCallback')
 			this.#onUnloadCallbacks.remove(removeCb)
 			removeCb()
 		}

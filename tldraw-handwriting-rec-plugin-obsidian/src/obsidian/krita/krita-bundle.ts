@@ -116,7 +116,8 @@ async function inflateDeflateBytes(bytes: Uint8Array): Promise<string> {
 	if (typeof DecompressionStream === 'undefined') {
 		throw new Error('DecompressionStream is not available in this runtime.')
 	}
-	const decompressed = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'))
+	const blobBytes = new Uint8Array(bytes)
+	const decompressed = new Blob([blobBytes]).stream().pipeThrough(new DecompressionStream('deflate'))
 	const arrayBuffer = await new Response(decompressed).arrayBuffer()
 	return new TextDecoder().decode(arrayBuffer)
 }
@@ -167,7 +168,7 @@ function parseManifestXml(manifestXml: string): KritaBundleManifestEntry[] {
 	})
 
 	return fileEntries
-		.map((entry) => {
+		.map<KritaBundleManifestEntry | undefined>((entry) => {
 			const fullPathRaw = getTextContent(entry, 'manifest:full-path', 'full-path')
 			if (!fullPathRaw || fullPathRaw === '/') return undefined
 			const fullPath = normalizeBundlePath(fullPathRaw)
@@ -183,14 +184,14 @@ function parseManifestXml(manifestXml: string): KritaBundleManifestEntry[] {
 				.filter(Boolean)
 			return {
 				fullPath,
-				mediaType,
-				md5,
+				mediaType: mediaType || undefined,
+				md5: md5 || undefined,
 				tags,
 				resourceType: inferResourceType(fullPath, mediaType),
 				name: fullPath.split('/').at(-1) ?? fullPath,
 			}
 		})
-		.filter((entry): entry is KritaBundleManifestEntry => !!entry)
+		.filter((entry): entry is KritaBundleManifestEntry => entry !== undefined)
 }
 
 function parseMetaXml(metaXml: string): KritaBundleMetadata {
