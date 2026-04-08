@@ -120,6 +120,7 @@ import {
 	setPencilOpacitySensitivity,
 	setPencilSampledOverlayEnabled,
 	activeBrushTipRef,
+	editorZoomRef,
 } from 'src/tldraw/rendering/pencil-draw-shape-util'
 import { applyGrainToDab, getPressureOpacityStyle } from 'src/tldraw/rendering/pencil-texture'
 import PluginKeyboardShortcutsDialog from './PluginKeyboardShortcutsDialog'
@@ -129,6 +130,7 @@ import {
 	getYoutubePlaylistIdFromUrl,
 } from 'src/obsidian/youtube/playlist-extractor'
 import { generateFallbackTip } from 'src/obsidian/krita/fallback-tips'
+import { performanceMonitor } from 'src/utilities/performance-monitor'
 
 const console = {
 	log: (..._args: unknown[]) => {},
@@ -2842,6 +2844,10 @@ const TldrawApp = ({
 		const onEditorChange = () => {
 			const cam = editor.getCamera()
 			const last = lastCameraRef.current
+			
+			// Update zoom level ref for zoom-aware rendering
+			editorZoomRef.current = cam.z
+			
 			if (!last) {
 				lastCameraRef.current = { x: cam.x, y: cam.y, z: cam.z }
 				return
@@ -2866,6 +2872,14 @@ const TldrawApp = ({
 			setIsCameraMoving(false)
 		}
 	}, [editor])
+
+	// Initialize continuous performance monitoring
+	React.useEffect(() => {
+		performanceMonitor.startContinuous()
+		return () => {
+			performanceMonitor.stopContinuous()
+		}
+	}, [])
 
 	const pencilDefaultStrokeEnabled = userSettings.debugLogs?.pencilDefaultStroke ?? true
 	const pencilBaseStrokeEnabled = userSettings.debugLogs?.pencilBaseStroke ?? true

@@ -1,4 +1,4 @@
-import { FileView, TFile } from 'obsidian'
+import { FileView, TFile, createEl } from 'obsidian'
 import { Root } from 'react-dom/client'
 import InFrontOfTheCanvas from 'src/components/InFrontOfTheCanvas'
 import {
@@ -68,45 +68,37 @@ export abstract class BaseTldrawFileView<View extends FileView = FileView> {
 	 * Initialize and manage the performance metrics display in the header
 	 */
 	private initializePerformanceDisplay(): void {
-		// Recreate the element on each view load to avoid stale nodes.
-		this.#performanceDisplayEl?.remove()
-		const ownerDocument = this.fileView.contentEl.ownerDocument
-
 		// Create display element
-		this.#performanceDisplayEl = ownerDocument.createElement('div')
+		this.#performanceDisplayEl = createEl('div')
 		this.#performanceDisplayEl.style.cssText = `
+			position: absolute;
+			right: 0;
+			top: 50%;
+			transform: translateY(-50%);
+			padding: 4px 8px;
 			font-size: 11px;
-			line-height: 1.2;
-			font-family: var(--font-monospace);
+			font-family: monospace;
+			color: #888;
+			background: rgba(0, 0, 0, 0.05);
+			border-radius: 3px;
+			min-width: 100px;
+			text-align: right;
+			pointer-events: none;
 			white-space: nowrap;
-			opacity: 0.85;
-			margin-left: 8px;
 		`
-		this.#performanceDisplayEl.textContent = 'FPS: -- (ms: --.-)'
+		this.#performanceDisplayEl.textContent = '— FPS'
 
-		const leaf = this.fileView.containerEl.closest('.workspace-leaf')
-		const titleContainer = leaf?.querySelector(
-			'.view-header-title-container.mod-at-start.mod-fade.mod-at-end, .view-header-title-container'
-		)
-
-		if (titleContainer instanceof HTMLElement) {
-			titleContainer.appendChild(this.#performanceDisplayEl)
-		} else {
-			const fallbackHeader = leaf?.querySelector('.view-header')
-			if (fallbackHeader instanceof HTMLElement) {
-				fallbackHeader.appendChild(this.#performanceDisplayEl)
-			} else {
-				// Last fallback: attach in the view root so the metric is still visible.
-				this.fileView.contentEl.prepend(this.#performanceDisplayEl)
+		// Find and attach to the view header title container
+		const titleContainer = this.fileView.containerEl.querySelector('.view-header-title-container')
+		if (titleContainer) {
+			// Make the container relatively positioned if not already
+			if ((titleContainer as HTMLElement).style.position === '') {
+				(titleContainer as HTMLElement).style.position = 'relative'
 			}
-		}
+			titleContainer.appendChild(this.#performanceDisplayEl)
 
-		// Start update loop
-		this.startPerformanceDisplayUpdates()
-
-		// Ensure node belongs to the right document in pop-out windows.
-		if (this.#performanceDisplayEl.ownerDocument !== ownerDocument) {
-			ownerDocument.adoptNode(this.#performanceDisplayEl)
+			// Start update loop
+			this.startPerformanceDisplayUpdates()
 		}
 	}
 
@@ -122,14 +114,14 @@ export abstract class BaseTldrawFileView<View extends FileView = FileView> {
 			if (!this.#performanceDisplayEl) return
 
 			const metrics = performanceMonitor.getRollingMetrics()
-			if (metrics.currentFps <= 0 || metrics.avgFrameTime <= 0) {
-				this.#performanceDisplayEl.textContent = 'FPS: -- (ms: --.-)'
-				return
-			}
+			if (metrics.currentFps > 0) {
+				const fpsColor = metrics.currentFps >= 50 ? '#2ecc71' : metrics.currentFps >= 30 ? '#f39c12' : '#e74c3c'
+				const frameTimeMs = metrics.avgFrameTime.toFixed(1)
+				const fps = metrics.currentFps.toFixed(0)
 
-			const fps = metrics.currentFps.toFixed(0)
-			const frameTimeMs = metrics.avgFrameTime.toFixed(1)
-			this.#performanceDisplayEl.textContent = `FPS: ${fps} (ms: ${frameTimeMs})`
+				this.#performanceDisplayEl.textContent = `⚡ ${fps} FPS (${frameTimeMs}ms)`
+				this.#performanceDisplayEl.style.color = fpsColor
+			}
 		}, 200)
 	}
 

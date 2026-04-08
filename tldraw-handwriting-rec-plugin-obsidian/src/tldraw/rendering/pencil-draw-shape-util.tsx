@@ -21,6 +21,12 @@ export const activeStampShapeModeRef: React.MutableRefObject<StampShapeMode> = {
 }
 
 /**
+ * Module-level reference to the editor's current zoom level.
+ * Set by TldrawApp to enable zoom-aware sampling degradation.
+ */
+export const editorZoomRef: React.MutableRefObject<number> = { current: 1 }
+
+/**
  * Cache for ImageBitmap -> data URL conversions to avoid repeated rendering.
  */
 const bitmapDataUrlCache = new WeakMap<ImageBitmap, string>()
@@ -259,7 +265,18 @@ function buildPressureSampledRibbonStroke(shape: TLDrawShape, baseElement: React
 
 	const paths: React.ReactNode[] = []
 	// Performance: sample fewer dabs per segment to keep stroke rendering responsive.
-	const maxSampleLength = Math.max(4.5, strokeWidth * 2.4)
+	// Apply zoom-aware degradation: at far zoom levels, increase sample length (fewer dabs)
+	const baseMaxSampleLength = Math.max(4.5, strokeWidth * 2.4)
+	const zoomLevel = editorZoomRef.current
+	let maxSampleLength = baseMaxSampleLength
+	
+	// Degrade sampling quality at far zoom levels
+	if (zoomLevel < 0.5) {
+		maxSampleLength = baseMaxSampleLength * 2 // 2x stride at <50% zoom
+	} else if (zoomLevel < 1) {
+		maxSampleLength = baseMaxSampleLength * 1.2 // 1.2x stride at 50-100% zoom
+	}
+	
 	const stampShapeMode = activeStampShapeModeRef.current
 
 	if (stampShapeMode === 'circle') {
@@ -355,6 +372,24 @@ function buildPressureSampledRibbonStroke(shape: TLDrawShape, baseElement: React
 	)
 }
 
+/**
+ * Calculate stride multiplier based on zoom level for low-zoom cheap mode.
+ * At very low zoom, we skip more samples to reduce render load.
+ */
+function getZoomAwareStride(sampleCount: number): number {
+	const zoomLevel = editorZoomRef.current
+	const baseStride = sampleCount > 20 ? 2 : 1
+	
+	// At zoom < 0.4, use 4x stride (every 4th sample)
+	// At zoom 0.4-0.5, use 2x stride
+	if (zoomLevel < 0.4) {
+		return baseStride * 4
+	} else if (zoomLevel < 0.5) {
+		return baseStride * 2
+	}
+	return baseStride
+}
+
 function buildCircleStampStroke(
 	localPressurePoints: LocalPressurePoint[],
 	strokeColor: string,
@@ -363,6 +398,7 @@ function buildCircleStampStroke(
 	shapeId: string
 ): React.ReactNode {
 	const paths: React.ReactNode[] = []
+	const zoomLevel = editorZoomRef.current
 
 	for (let i = 0; i < localPressurePoints.length - 1; i++) {
 		const p1 = localPressurePoints[i]
@@ -371,7 +407,7 @@ function buildCircleStampStroke(
 
 		const segmentLength = distanceBetweenPoints(p1, p2)
 		const sampleCount = Math.max(1, Math.ceil(segmentLength / maxSampleLength))
-		const sampleStride = sampleCount > 20 ? 2 : 1
+		const sampleStride = getZoomAwareStride(sampleCount)
 
 		for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex += sampleStride) {
 			const startT = sampleIndex / sampleCount
@@ -386,11 +422,15 @@ function buildCircleStampStroke(
 			const averageOpacity = (startOpacity + endOpacity) / 2
 			const sampledSize = strokeWidth * lerp(0.72, 0.96, averagePressure)
 			const baseRadius = Math.max(0.2, sampledSize / 2)
-			const layers = [
-				{ scale: 1.18, opacity: 0.12 },
-				{ scale: 0.92, opacity: 0.34 },
-				{ scale: 0.68, opacity: 0.58 },
-			]
+			
+			// At very low zoom (< 0.4), use single layer; otherwise use full 3-layer effect
+			const layers = zoomLevel < 0.4 
+				? [{ scale: 1, opacity: 0.5 }]
+				: [
+					{ scale: 1.18, opacity: 0.12 },
+					{ scale: 0.92, opacity: 0.34 },
+					{ scale: 0.68, opacity: 0.58 },
+				]
 
 			for (const [layerIndex, layer] of layers.entries()) {
 				paths.push(
@@ -428,7 +468,7 @@ function buildRectangleStampStroke(
 
 		const segmentLength = distanceBetweenPoints(p1, p2)
 		const sampleCount = Math.max(1, Math.ceil(segmentLength / maxSampleLength))
-		const sampleStride = sampleCount > 20 ? 2 : 1
+		const sampleStride = getZoomAwareStride(sampleCount)
 
 		for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex += sampleStride) {
 			const startT = sampleIndex / sampleCount
