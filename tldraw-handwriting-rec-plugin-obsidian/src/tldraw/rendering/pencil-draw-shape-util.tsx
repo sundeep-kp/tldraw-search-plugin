@@ -10,6 +10,37 @@ import { getPressureOpacityStyle } from 'src/tldraw/rendering/pencil-texture'
 
 export const PENCIL_FEATHER_FILTER_ID = 'pencil-feather-filter'
 
+/**
+ * Module-level reference to the active brush tip bitmap.
+ * Set by TldrawApp to make the brush context accessible to the renderer.
+ */
+export const activeBrushTipRef: React.MutableRefObject<ImageBitmap | null> = { current: null }
+
+/**
+ * Cache for ImageBitmap -> data URL conversions to avoid repeated rendering.
+ */
+const bitmapDataUrlCache = new WeakMap<ImageBitmap, string>()
+
+/**
+ * Converts an ImageBitmap to a data URL for use in SVG <image> elements.
+ */
+function imageBitmapToDataUrl(bitmap: ImageBitmap): string {
+	if (bitmapDataUrlCache.has(bitmap)) {
+		return bitmapDataUrlCache.get(bitmap)!
+	}
+
+	const canvas = document.createElement('canvas')
+	canvas.width = bitmap.width
+	canvas.height = bitmap.height
+	const ctx = canvas.getContext('2d')
+	if (!ctx) throw new Error('Failed to create 2D canvas context')
+
+	ctx.drawImage(bitmap, 0, 0)
+	const dataUrl = canvas.toDataURL('image/png')
+	bitmapDataUrlCache.set(bitmap, dataUrl)
+	return dataUrl
+}
+
 const DEFAULT_PENCIL_OPACITY_SENSITIVITY = 1
 const DEFAULT_PENCIL_CROSS_SECTION_ASPECT_RATIO = 5
 let pencilOpacitySensitivity = DEFAULT_PENCIL_OPACITY_SENSITIVITY
@@ -223,6 +254,102 @@ function buildPressureSampledRibbonStroke(shape: TLDrawShape, baseElement: React
 
 	const paths: React.ReactNode[] = []
 	const maxSampleLength = Math.max(2.2, strokeWidth * 1.1)
+
+	// Check if we should use a brush bitmap stamp instead of polygon rendering
+	const brushBitmap = activeBrushTipRef.current
+	const useBrushStamp = brushBitmap !== null
+
+	if (useBrushStamp && brushBitmap) {
+		// Use brush bitmap stamping
+		let brushDataUrl: string
+		try {
+			brushDataUrl = imageBitmapToDataUrl(brushBitmap)
+		} catch (error) {
+			console.error('[PencilDrawShapeUtil] Failed to convert brush bitmap to data URL:', error)
+			// Fall back to polygon rendering
+			return buildPolygonRibbonStroke(
+				shape,
+				localPressurePoints,
+				strokeColor,
+				strokeWidth,
+				maxSampleLength
+			)
+		}
+
+		for (let i = 0; i < localPressurePoints.length - 1; i++) {
+			const p1 = localPressurePoints[i]
+			const p2 = localPressurePoints[i + 1]
+			if (p1.x === p2.x && p1.y === p2.y) continue
+
+			const segmentLength = distanceBetweenPoints(p1, p2)
+			const sampleCount = Math.max(1, Math.ceil(segmentLength / maxSampleLength))
+
+			for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++) {
+				const startT = sampleIndex / sampleCount
+				const endT = (sampleIndex + 1) / sampleCount
+				const startPoint = interpolatePressurePoint(p1, p2, startT)
+				const endPoint = interpolatePressurePoint(p1, p2, endT)
+				const segmentLength = distanceBetweenPoints(startPoint, endPoint)
+				if (segmentLength === 0) continue
+
+				const centerX = (startPoint.x + endPoint.x) / 2
+				const centerY = (startPoint.y + endPoint.y) / 2
+				const tangentX = (endPoint.x - startPoint.x) / segmentLength
+				const tangentY = (endPoint.y - startPoint.y) / segmentLength
+				const angle = Math.atan2(tangentY, tangentX) * (180 / Math.PI)
+
+				const averagePressure = (startPoint.pressure + endPoint.pressure) / 2
+				const sampledSize = strokeWidth * lerp(0.72, 0.96, averagePressure)
+
+				// Use SVG transform for proper rotation instead of CSS
+				const transformStr = `translate(${centerX} ${centerY}) rotate(${angle}) translate(${-sampledSize / 2} ${-sampledSize / 2})`
+
+				paths.push(
+					<image
+						key={`${shape.id}-brush-stamp-${i}-${sampleIndex}`}
+						href={brushDataUrl}
+						x={0}
+						y={0}
+						width={sampledSize}
+						height={sampledSize}
+						opacity={Math.max(0.25, Math.min(1, averagePressure * 0.9))}
+						transform={transformStr}
+						pointerEvents="none"
+					/>
+				)
+			}
+		}
+	} else {
+		// Fall back to polygon rendering when no brush bitmap
+		return buildPolygonRibbonStroke(
+			shape,
+			localPressurePoints,
+			strokeColor,
+			strokeWidth,
+			maxSampleLength
+		)
+	}
+
+	if (paths.length === 0) return null
+
+	return (
+		<g pointerEvents="none">
+			{paths}
+		</g>
+	)
+}
+
+/**
+ * Build polygon-based ribbon stroke (original implementation)
+ */
+function buildPolygonRibbonStroke(
+	shape: TLDrawShape,
+	localPressurePoints: LocalPressurePoint[],
+	strokeColor: string,
+	strokeWidth: number,
+	maxSampleLength: number
+): React.ReactNode {
+	const paths: React.ReactNode[] = []
 
 	for (let i = 0; i < localPressurePoints.length - 1; i++) {
 		const p1 = localPressurePoints[i]
@@ -490,6 +617,11 @@ function buildPressureGradientOverlay(
  * captured pressure data for the shape.
  */
 export class PencilDrawShapeUtil extends DrawShapeUtil {
+	private shouldBypassRibbonForDebugShape(shape: TLDrawShape): boolean {
+		const meta = (shape as { meta?: Record<string, unknown> }).meta
+		return meta?.ptlDebugNoRibbon === true
+	}
+
 	override component(shape: TLDrawShape) {
 		console.log('[PencilDrawShapeUtil.component] rendering shape', {
 			shapeId: shape.id,
@@ -498,10 +630,11 @@ export class PencilDrawShapeUtil extends DrawShapeUtil {
 			willRender: pencilDefaultStrokeEnabled ? 'full' : 'empty-g',
 		})
 		const element = super.component(shape)
-		const ribbonStroke = buildPressureSampledRibbonStroke(shape, element)
-		if (!pencilDefaultStrokeEnabled && pencilCrossSectionAspectRatio === 1) {
-			return <g pointerEvents="none" />
+		if (this.shouldBypassRibbonForDebugShape(shape)) {
+			return element
 		}
+		const ribbonStroke = buildPressureSampledRibbonStroke(shape, element)
+		// Never return an empty group for a valid draw shape; keep at least base element visible.
 		if (pencilCrossSectionAspectRatio !== 1 && ribbonStroke) {
 			return ribbonStroke
 		}
@@ -526,10 +659,11 @@ export class PencilDrawShapeUtil extends DrawShapeUtil {
 			willRender: pencilDefaultStrokeEnabled ? 'full' : 'empty-g',
 		})
 		const element = super.toSvg(shape, ctx)
-		const ribbonStroke = buildPressureSampledRibbonStroke(shape, element)
-		if (!pencilDefaultStrokeEnabled && pencilCrossSectionAspectRatio === 1) {
-			return <g pointerEvents="none" />
+		if (this.shouldBypassRibbonForDebugShape(shape)) {
+			return element
 		}
+		const ribbonStroke = buildPressureSampledRibbonStroke(shape, element)
+		// Never export an empty group for a valid draw shape; keep at least base element visible.
 		if (pencilCrossSectionAspectRatio !== 1 && ribbonStroke) {
 			return ribbonStroke
 		}

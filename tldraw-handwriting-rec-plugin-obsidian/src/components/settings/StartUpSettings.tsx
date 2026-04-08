@@ -252,6 +252,14 @@ function StartUpSettingsGroup() {
 														/>
 														<span>Pencil fallback styling</span>
 													</label>
+														<label className="debug-checkbox-label">
+															<input
+																type="checkbox"
+																checked={settings.debugLogs?.pencilRectangleStamp ?? false}
+																onChange={e => onDebugLogChange('pencilRectangleStamp', e.target.checked)}
+															/>
+															<span>Pencil rectangle stamp (debug)</span>
+														</label>
 												</div>
 											</div>
 										</div>

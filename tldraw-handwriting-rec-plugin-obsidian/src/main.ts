@@ -77,6 +77,7 @@ export default class TldrawPlugin extends Plugin {
 	currTldrawEditor?: Editor
 	onTriggerHandwritingSearch?: () => void
 	onTriggerAnchorStickerAssign?: () => void
+	onTriggerCaptureSelectionStamp?: () => void
 
 	// misc:
 	embedBoundsSelectorIcon: string

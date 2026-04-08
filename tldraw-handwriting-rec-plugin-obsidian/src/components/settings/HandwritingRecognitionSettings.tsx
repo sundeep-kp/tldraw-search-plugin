@@ -384,7 +384,7 @@ function HandwritingRecognitionSettingsGroup() {
 	)
 
 	const onOpenKritaBundleImportModal = useCallback(() => {
-		new KritaBundleImportModal(settingsManager.plugin.app, settingsManager.plugin).open()
+		new BundleImportModal(settingsManager.plugin.app, settingsManager.plugin).open()
 	}, [settingsManager])
 
 	const onKritaBundleFolderChange = useCallback(

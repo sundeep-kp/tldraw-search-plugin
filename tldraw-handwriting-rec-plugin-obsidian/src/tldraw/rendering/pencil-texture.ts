@@ -115,6 +115,43 @@ export function createPencilGrainPattern(patternId: string, scale: number = 1): 
 	return pattern
 }
 
+function sampleNoise2d(x: number, y: number): number {
+	const t = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453
+	return t - Math.floor(t)
+}
+
+export function applyGrainToDab(
+	ctx: CanvasRenderingContext2D,
+	x: number,
+	y: number,
+	size: number,
+	intensity: number
+): void {
+	const clampedIntensity = Math.max(0, Math.min(1, intensity))
+	if (clampedIntensity <= 0) return
+
+	const radius = Math.max(2, size / 2)
+	const dots = Math.max(16, Math.floor(radius * 1.8))
+
+	ctx.save()
+	ctx.globalCompositeOperation = 'multiply'
+	ctx.globalAlpha = clampedIntensity
+	ctx.fillStyle = 'rgba(0,0,0,1)'
+
+	for (let i = 0; i < dots; i++) {
+		const angle = sampleNoise2d(x + i * 1.13, y - i * 0.91) * Math.PI * 2
+		const dist = Math.sqrt(sampleNoise2d(x - i * 0.37, y + i * 1.71)) * radius
+		const px = x + Math.cos(angle) * dist
+		const py = y + Math.sin(angle) * dist
+		const pr = Math.max(0.35, sampleNoise2d(px, py) * 1.5)
+		ctx.beginPath()
+		ctx.arc(px, py, pr, 0, Math.PI * 2)
+		ctx.fill()
+	}
+
+	ctx.restore()
+}
+
 /**
  * Inject pencil texture definitions into the SVG defs section.
  * Call this once during editor initialization to make filters available.

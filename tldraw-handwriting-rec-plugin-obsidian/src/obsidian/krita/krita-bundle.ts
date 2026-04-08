@@ -92,6 +92,55 @@ function parseXml(xmlText: string): Document {
 	return new DOMParser().parseFromString(xmlText, 'application/xml')
 }
 
+function isPngSignature(bytes: Uint8Array) {
+	return bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47
+}
+
+function readPngChunks(bytes: Uint8Array) {
+	const chunks: Array<{ type: string; data: Uint8Array }> = []
+	let offset = 8
+	while (offset + 8 <= bytes.length) {
+		const view = new DataView(bytes.buffer, bytes.byteOffset + offset, 4)
+		const length = view.getUint32(0, false)
+		const type = String.fromCharCode(bytes[offset + 4], bytes[offset + 5], bytes[offset + 6], bytes[offset + 7])
+		const dataStart = offset + 8
+		const dataEnd = dataStart + length
+		chunks.push({ type, data: bytes.slice(dataStart, dataEnd) })
+		offset = dataEnd + 4
+		if (type === 'IEND') break
+	}
+	return chunks
+}
+
+async function inflateDeflateBytes(bytes: Uint8Array): Promise<string> {
+	if (typeof DecompressionStream === 'undefined') {
+		throw new Error('DecompressionStream is not available in this runtime.')
+	}
+	const decompressed = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'))
+	const arrayBuffer = await new Response(decompressed).arrayBuffer()
+	return new TextDecoder().decode(arrayBuffer)
+}
+
+async function extractPresetXmlFromKppBytes(bytes: Uint8Array): Promise<string | undefined> {
+	if (!isPngSignature(bytes)) return undefined
+	for (const chunk of readPngChunks(bytes)) {
+		if (chunk.type !== 'zTXt') continue
+		const nulIndex = chunk.data.indexOf(0)
+		if (nulIndex < 0 || nulIndex + 2 > chunk.data.length) continue
+		const keyword = new TextDecoder().decode(chunk.data.slice(0, nulIndex))
+		if (keyword !== 'preset') continue
+		const compressionMethod = chunk.data[nulIndex + 1]
+		if (compressionMethod !== 0) continue
+		try {
+			return await inflateDeflateBytes(chunk.data.slice(nulIndex + 2))
+		} catch (error) {
+			console.warn('[KritaBundle] failed to inflate preset PNG text chunk', { error })
+			return undefined
+		}
+	}
+	return undefined
+}
+
 function getTextContent(node: Element, ...selectors: string[]) {
 	for (const selector of selectors) {
 		const selected = node.getAttribute(selector)
@@ -230,8 +279,18 @@ function findParamElements(document: Document, paramName: string): Element[] {
 		const localName = (node.localName || node.tagName || '').toLowerCase()
 		if (localName !== 'param') return false
 		const name = node.getAttribute('name')?.trim().toLowerCase()
-		return name === wanted
+		if (!name) return false
+		return name === wanted || name.endsWith(`/${wanted}`) || name.includes(wanted)
 	})
+}
+
+function decodeXmlEntities(raw: string): string {
+	return raw
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>')
+		.replace(/&quot;/g, '"')
+		.replace(/&apos;/g, "'")
+		.replace(/&amp;/g, '&')
 }
 
 function getParamStringValue(param: Element): string | undefined {
@@ -303,6 +362,29 @@ function parseCurvePointsFromParam(document: Document, paramName: string): Array
 	return []
 }
 
+function collectParamNames(document: Document): string[] {
+	const names = new Set<string>()
+	for (const node of Array.from(document.getElementsByTagName('*'))) {
+		const localName = (node.localName || node.tagName || '').toLowerCase()
+		if (localName !== 'param') continue
+		const name = node.getAttribute('name')?.trim()
+		if (name) names.add(name)
+	}
+	return Array.from(names)
+}
+
+function extractEmbeddedBrushResourceFilename(document: Document): string | undefined {
+	for (const node of Array.from(document.getElementsByTagName('*'))) {
+		const localName = (node.localName || node.tagName || '').toLowerCase()
+		if (localName !== 'resource') continue
+		const type = node.getAttribute('type')?.trim().toLowerCase()
+		if (type !== 'brushes' && type !== 'brush') continue
+		const filename = node.getAttribute('filename')?.trim()
+		if (filename) return filename
+	}
+	return undefined
+}
+
 function sampleCurveY(points: Array<{ x: number; y: number }>, targetX: number): number | undefined {
 	if (points.length === 0) return undefined
 	const sorted = [...points].sort((a, b) => a.x - b.x)
@@ -335,7 +417,22 @@ function fitCurveExponent(points: Array<{ x: number; y: number }>, fallback: num
 }
 
 function extractBrushTipFilename(document: Document, kppXml: string): string | undefined {
-	for (const param of findParamElements(document, 'filename')) {
+	const embeddedResourceFilename = extractEmbeddedBrushResourceFilename(document)
+	if (embeddedResourceFilename) return embeddedResourceFilename
+
+	for (const paramName of ['filename', 'brushfilename', 'brush_file', 'file']) {
+		for (const param of findParamElements(document, paramName)) {
+			const value = getParamStringValue(param)
+			if (value) return value
+		}
+	}
+
+	for (const param of Array.from(document.getElementsByTagName('*')).filter((node) => {
+		const localName = (node.localName || node.tagName || '').toLowerCase()
+		if (localName !== 'param') return false
+		const name = node.getAttribute('name')?.toLowerCase() ?? ''
+		return name.includes('filename') || name.includes('brush')
+	})) {
 		const value = getParamStringValue(param)
 		if (value) return value
 	}
@@ -349,11 +446,13 @@ function extractBrushTipFilename(document: Document, kppXml: string): string | u
 		}
 
 		const text = param.textContent ?? ''
-		const match = text.match(/<brush[^>]*filename\s*=\s*['"]([^'"]+)['"]/i)
+		const decodedText = decodeXmlEntities(text)
+		const match = decodedText.match(/<brush[^>]*filename\s*=\s*['"]([^'"]+)['"]/i)
 		if (match?.[1]) return match[1].trim()
 	}
 
-	const fallbackMatch = kppXml.match(/<brush[^>]*filename\s*=\s*['"]([^'"]+)['"]/i)
+	const fallbackDecodedXml = decodeXmlEntities(kppXml)
+	const fallbackMatch = fallbackDecodedXml.match(/<brush[^>]*filename\s*=\s*['"]([^'"]+)['"]/i)
 	if (fallbackMatch?.[1]) return fallbackMatch[1].trim()
 
 	return undefined
@@ -375,6 +474,15 @@ async function extractBrushTipData(
 	for (const candidate of candidates) {
 		const bytes = await getZipEntryBytesByBundlePath(zip, candidate)
 		if (bytes) return bytes
+	}
+
+	const normalizedLookup = normalizeBundlePath(basename).toLowerCase()
+	for (const key of Object.keys(zip.files)) {
+		const normalizedKey = normalizeBundlePath(key).toLowerCase()
+		if (normalizedKey === normalizedLookup || normalizedKey.endsWith(`/${normalizedLookup}`)) {
+			const bytes = await getZipEntryBytes(zip, key)
+			if (bytes) return bytes
+		}
 	}
 
 	return null
@@ -427,6 +535,7 @@ async function derivePresetStyleFromKppText(
 	kppXml: string
 ): Promise<KritaDerivedPresetStyle> {
 	const kppDocument = parseXml(kppXml)
+	const embeddedBrushResourceFilename = extractEmbeddedBrushResourceFilename(kppDocument)
 	const signals = collectNumericSignals(kppXml)
 	const identity = `${presetName}:${presetPath}`.toLowerCase()
 
@@ -472,7 +581,7 @@ async function derivePresetStyleFromKppText(
 	const opacityCurvePoints = parseCurvePointsFromParam(kppDocument, 'PressureOpacity')
 	const opacityCurveExponent = fitCurveExponent(opacityCurvePoints, 1.2)
 	const rotationJitterRaw = parseFloatParam(kppDocument, ['rotation', 'jitter']) ?? 0
-	const brushTipFilename = extractBrushTipFilename(kppDocument, kppXml)
+	const brushTipFilename = extractBrushTipFilename(kppDocument, kppXml) ?? embeddedBrushResourceFilename
 	const brushTipData = await extractBrushTipData(zip, brushTipFilename)
 
 	return {
@@ -491,6 +600,23 @@ async function derivePresetStyleFromKppText(
 
 export async function parseKritaBundle(file: File): Promise<KritaBundleImportSummary> {
 	const zip = await JSZip.loadAsync(await file.arrayBuffer())
+	const zipKeys = Object.keys(zip.files)
+	const brushLikeZipEntries = zipKeys.filter((key) => {
+		const normalized = normalizeBundlePath(key).toLowerCase()
+		return (
+			normalized.includes('brush') ||
+			normalized.endsWith('.png') ||
+			normalized.endsWith('.gbr') ||
+			normalized.endsWith('.abr') ||
+			normalized.endsWith('.svg') ||
+			normalized.endsWith('.pat')
+		)
+	})
+	console.log('[KritaBundle] zip entry diagnostics', {
+		entryCount: zipKeys.length,
+		brushLikeCount: brushLikeZipEntries.length,
+		brushLikeSample: brushLikeZipEntries.slice(0, 20),
+	})
 	const manifestXml = await getZipEntryText(zip, 'META-INF/manifest.xml')
 	if (!manifestXml) {
 		throw new Error('This file is missing META-INF/manifest.xml and is not a valid Krita bundle.')
@@ -504,17 +630,47 @@ export async function parseKritaBundle(file: File): Promise<KritaBundleImportSum
 	const resourceEntries = manifestEntries.filter((entry) => entry.resourceType !== 'brush-preset')
 	const warnings: string[] = []
 	const derivedPresetStyles: Record<string, KritaDerivedPresetStyle> = {}
+	let didLogParamDiagnostics = false
 
 	for (const preset of presetEntries) {
-		const presetXml = await getZipEntryTextByBundlePath(zip, preset.fullPath)
+		const presetBytes = await getZipEntryBytesByBundlePath(zip, preset.fullPath)
+		const presetXml = presetBytes ? await extractPresetXmlFromKppBytes(presetBytes) : await getZipEntryTextByBundlePath(zip, preset.fullPath)
 		if (!presetXml) continue
 		try {
+			const presetDocument = parseXml(presetXml)
+			const debugTipFilename = extractBrushTipFilename(presetDocument, presetXml)
+			const embeddedBrushResourceFilename = extractEmbeddedBrushResourceFilename(presetDocument)
+			if (!didLogParamDiagnostics) {
+				didLogParamDiagnostics = true
+				const allParamNames = collectParamNames(presetDocument)
+				const interestingParamNames = allParamNames.filter((name) =>
+					/(pressure|opacity|size|spacing|rotation|jitter|brush|tip|curve)/i.test(name)
+				)
+				console.log('[KritaBundle] first preset param diagnostics', {
+					presetPath: preset.fullPath,
+					paramCount: allParamNames.length,
+					interestingParamSample: interestingParamNames.slice(0, 80),
+					brushTipFilename: debugTipFilename ?? null,
+					embeddedBrushResourceFilename: embeddedBrushResourceFilename ?? null,
+				})
+			}
+
 			derivedPresetStyles[preset.fullPath] = await derivePresetStyleFromKppText(
 				zip,
 				preset.name,
 				preset.fullPath,
 				presetXml
 			)
+			console.log('[KritaBundle] parsed preset', preset.fullPath, {
+				brushTipFilename: debugTipFilename ?? null,
+				embeddedBrushResourceFilename: embeddedBrushResourceFilename ?? null,
+				hasBrushTipData: !!derivedPresetStyles[preset.fullPath]?.brushTipData,
+				brushTipLen: derivedPresetStyles[preset.fullPath]?.brushTipData?.length ?? 0,
+				spacingFactor: derivedPresetStyles[preset.fullPath]?.spacingFactor,
+				sizeCurveExponent: derivedPresetStyles[preset.fullPath]?.sizeCurveExponent,
+				opacityCurveExponent: derivedPresetStyles[preset.fullPath]?.opacityCurveExponent,
+				rotationJitter: derivedPresetStyles[preset.fullPath]?.rotationJitter,
+			})
 		} catch (error) {
 			warnings.push(`Could not parse preset parameters for ${preset.name}.`)
 			console.warn('[KritaBundle] preset parse failed', { presetPath: preset.fullPath, error })

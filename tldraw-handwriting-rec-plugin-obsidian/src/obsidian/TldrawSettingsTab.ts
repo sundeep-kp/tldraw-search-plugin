@@ -161,6 +161,7 @@ export interface TldrawPluginSettings extends DeprecatedFileDestinationSettings 
 		pencilBaseStroke?: boolean
 		pencilSampledOverlay?: boolean
 		pencilFallbackStyling?: boolean
+		pencilRectangleStamp?: boolean
 	}
 	focusMode: boolean
 	fonts?: {
@@ -233,6 +234,7 @@ export interface TldrawPluginSettings extends DeprecatedFileDestinationSettings 
 		pencilOpacitySensitivity?: number
 		pencilCrossSectionAspectRatio?: number
 		kritaSelectedPresetId?: string
+		kritaStampShape?: 'auto' | 'circle' | 'rectangle'
 		pencilTextureIntensity?: number
 		pencilTextureEnabled?: boolean
 		showRecognizedBatchTextOverlay?: boolean
@@ -281,6 +283,7 @@ export const DEFAULT_SETTINGS = {
 		pencilBaseStroke: true,
 		pencilSampledOverlay: true,
 		pencilFallbackStyling: true,
+		pencilRectangleStamp: false,
 	},
 	focusMode: false,
 	fileDestinations: {
@@ -313,6 +316,7 @@ export const DEFAULT_SETTINGS = {
 		pencilOpacitySensitivity: 1,
 		pencilCrossSectionAspectRatio: 5,
 		kritaSelectedPresetId: '',
+		kritaStampShape: 'auto',
 		pencilTextureIntensity: 0.35,
 		pencilTextureEnabled: true,
 		showRecognizedBatchTextOverlay: false,

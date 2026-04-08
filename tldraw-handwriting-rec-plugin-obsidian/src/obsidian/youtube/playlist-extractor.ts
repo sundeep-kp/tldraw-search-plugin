@@ -120,6 +120,74 @@ function extractInnertubeConfig(html: string): { apiKey?: string; clientVersion?
 	}
 }
 
+function extractVisitorData(html: string): string | undefined {
+	return (
+		extractRegexGroup(html, /"VISITOR_DATA":"([^"]+)"/) ??
+		extractRegexGroup(html, /VISITOR_DATA\s*[:=]\s*"([^"]+)"/)
+	)
+}
+
+type ContinuationRequest = {
+	token: string
+	clickTrackingParams?: string
+}
+
+function upsertContinuationRequest(
+	requestsByToken: Map<string, ContinuationRequest>,
+	tokenCandidate: unknown,
+	clickTrackingParamsCandidate?: unknown
+) {
+	if (typeof tokenCandidate !== 'string' || tokenCandidate.length === 0) return
+	const existing = requestsByToken.get(tokenCandidate)
+	if (existing?.clickTrackingParams) return
+
+	const clickTrackingParams =
+		typeof clickTrackingParamsCandidate === 'string' && clickTrackingParamsCandidate.length > 0
+			? clickTrackingParamsCandidate
+			: undefined
+
+	requestsByToken.set(tokenCandidate, {
+		token: tokenCandidate,
+		clickTrackingParams: existing?.clickTrackingParams ?? clickTrackingParams,
+	})
+}
+
+function upsertContinuationFromObject(
+	requestsByToken: Map<string, ContinuationRequest>,
+	value: unknown,
+	fallbackClickTrackingParams?: unknown
+) {
+	if (!value || typeof value !== 'object') return
+	const obj = value as Record<string, unknown>
+
+	upsertContinuationRequest(
+		requestsByToken,
+		obj.token,
+		obj.clickTrackingParams ?? fallbackClickTrackingParams
+	)
+	upsertContinuationRequest(
+		requestsByToken,
+		obj.continuation,
+		obj.clickTrackingParams ?? fallbackClickTrackingParams
+	)
+
+	const webCommandMetadata = obj.webCommandMetadata as Record<string, unknown> | undefined
+	const url = typeof webCommandMetadata?.url === 'string' ? webCommandMetadata.url : undefined
+	if (url) {
+		try {
+			const parsed = new URL(url, 'https://www.youtube.com')
+			const continuation = parsed.searchParams.get('continuation')
+			upsertContinuationRequest(
+				requestsByToken,
+				continuation,
+				obj.clickTrackingParams ?? fallbackClickTrackingParams
+			)
+		} catch {
+			// ignore malformed urls
+		}
+	}
+}
+
 function addTokenFromCandidate(value: unknown, tokens: Set<string>) {
 	if (typeof value === 'string' && value.length > 0) {
 		tokens.add(value)
@@ -151,11 +219,11 @@ function extractText(value: unknown): string | undefined {
 function collectPlaylistArtifacts(
 	value: unknown,
 	videosById: Map<string, string | undefined>,
-	tokens: Set<string>
+	requestsByToken: Map<string, ContinuationRequest>
 ): void {
 	if (!value || typeof value !== 'object') return
 	if (Array.isArray(value)) {
-		for (const item of value) collectPlaylistArtifacts(item, videosById, tokens)
+		for (const item of value) collectPlaylistArtifacts(item, videosById, requestsByToken)
 		return
 	}
 
@@ -190,28 +258,76 @@ function collectPlaylistArtifacts(
 		const continuationCommand = continuationEndpoint?.continuationCommand as
 			| Record<string, unknown>
 			| undefined
-		addTokenFromCandidate(continuationCommand?.token, tokens)
+		const endpointClickTrackingParams = continuationEndpoint?.clickTrackingParams
+		upsertContinuationRequest(
+			requestsByToken,
+			continuationCommand?.token,
+			endpointClickTrackingParams
+		)
 		const reloadContinuationData = continuationItemRenderer.reloadContinuationData as
 			| Record<string, unknown>
 			| undefined
-		addTokenFromCandidate(reloadContinuationData?.continuation, tokens)
+		upsertContinuationRequest(
+			requestsByToken,
+			reloadContinuationData?.continuation,
+			reloadContinuationData?.clickTrackingParams
+		)
 	}
 
 	const nextContinuationData = obj.nextContinuationData as Record<string, unknown> | undefined
 	if (nextContinuationData) {
-		addTokenFromCandidate(nextContinuationData.continuation, tokens)
+		upsertContinuationRequest(
+			requestsByToken,
+			nextContinuationData.continuation,
+			nextContinuationData.clickTrackingParams
+		)
 	}
 
 	const continuationEndpoint = obj.continuationEndpoint as Record<string, unknown> | undefined
 	if (continuationEndpoint) {
 		const continuationCommand = continuationEndpoint.continuationCommand as Record<string, unknown> | undefined
 		if (continuationCommand) {
-			addTokenFromCandidate(continuationCommand.token, tokens)
+			upsertContinuationRequest(
+				requestsByToken,
+				continuationCommand.token,
+				continuationEndpoint.clickTrackingParams
+			)
+		}
+
+		upsertContinuationFromObject(
+			requestsByToken,
+			continuationCommand,
+			continuationEndpoint.clickTrackingParams
+		)
+
+		const commandExecutorCommand = continuationEndpoint.commandExecutorCommand as
+			| Record<string, unknown>
+			| undefined
+		if (commandExecutorCommand) {
+			upsertContinuationFromObject(
+				requestsByToken,
+				commandExecutorCommand,
+				continuationEndpoint.clickTrackingParams
+			)
+			if (Array.isArray(commandExecutorCommand.commands)) {
+				for (const command of commandExecutorCommand.commands) {
+					upsertContinuationFromObject(
+						requestsByToken,
+						command,
+						continuationEndpoint.clickTrackingParams
+					)
+				}
+			}
 		}
 	}
 
+	// Some responses expose continuation command objects without a continuationEndpoint wrapper.
+	upsertContinuationFromObject(requestsByToken, obj.continuationCommand, obj.clickTrackingParams)
+	upsertContinuationFromObject(requestsByToken, obj.reloadContinuationData, obj.clickTrackingParams)
+	upsertContinuationFromObject(requestsByToken, obj.commandExecutorCommand, obj.clickTrackingParams)
+
 	for (const nestedValue of Object.values(obj)) {
-		collectPlaylistArtifacts(nestedValue, videosById, tokens)
+		collectPlaylistArtifacts(nestedValue, videosById, requestsByToken)
 	}
 }
 
@@ -233,18 +349,73 @@ function addPlaylistRendererVideo(
 async function fetchBrowseContinuation(
 	apiKey: string,
 	clientVersion: string,
-	continuation: string
+	request: ContinuationRequest,
+	visitorData?: string
 ): Promise<unknown> {
+	const headers: Record<string, string> = {
+		'content-type': 'application/json',
+		'x-youtube-client-name': '1',
+		'x-youtube-client-version': clientVersion,
+		origin: 'https://www.youtube.com',
+		referer: 'https://www.youtube.com/',
+	}
+
+	if (visitorData) {
+		headers['x-goog-visitor-id'] = visitorData
+	}
+
+	const context: Record<string, unknown> = {
+		client: {
+			clientName: 'WEB',
+			clientVersion,
+		},
+	}
+
+	if (request.clickTrackingParams) {
+		context.clickTracking = {
+			clickTrackingParams: request.clickTrackingParams,
+		}
+	}
+
 	const response = await requestUrl({
 		url: `https://www.youtube.com/youtubei/v1/browse?key=${encodeURIComponent(apiKey)}`,
 		method: 'POST',
-		headers: {
-			'content-type': 'application/json',
-			'x-youtube-client-name': '1',
-			'x-youtube-client-version': clientVersion,
-			origin: 'https://www.youtube.com',
-			referer: 'https://www.youtube.com/',
-		},
+		headers,
+		body: JSON.stringify({
+			context,
+			continuation: request.token,
+		}),
+	})
+
+	try {
+		return JSON.parse(response.text)
+	} catch {
+		return undefined
+	}
+}
+
+async function fetchBrowseByPlaylistId(
+	apiKey: string,
+	clientVersion: string,
+	playlistId: string,
+	visitorData?: string
+): Promise<unknown> {
+	const headers: Record<string, string> = {
+		'content-type': 'application/json',
+		'x-youtube-client-name': '1',
+		'x-youtube-client-version': clientVersion,
+		origin: 'https://www.youtube.com',
+		referer: 'https://www.youtube.com/',
+	}
+
+	if (visitorData) {
+		headers['x-goog-visitor-id'] = visitorData
+	}
+
+	const response = await requestUrl({
+		url: `https://www.youtube.com/youtubei/v1/browse?key=${encodeURIComponent(apiKey)}`,
+		method: 'POST',
+		headers,
 		body: JSON.stringify({
 			context: {
 				client: {
@@ -252,7 +423,7 @@ async function fetchBrowseContinuation(
 					clientVersion,
 				},
 			},
-			continuation,
+			browseId: `VL${playlistId}`,
 		}),
 	})
 
@@ -288,25 +459,71 @@ export async function extractYoutubePlaylistVideoIds(inputUrl: string): Promise<
 		extractJsonLiteralAfterMarker(html, YT_INITIAL_DATA_MARKERS[3])
 
 	const { apiKey, clientVersion } = extractInnertubeConfig(html)
+	const visitorData = extractVisitorData(html)
 	if (!apiKey || !clientVersion) {
 		throw new Error('Could not read YouTube internal API config from the playlist page.')
 	}
 
 	const videosById = new Map<string, string | undefined>()
-	const tokens = new Set<string>()
+	const requestsByToken = new Map<string, ContinuationRequest>()
 
-	collectPlaylistArtifacts(initialData, videosById, tokens)
+	collectPlaylistArtifacts(initialData, videosById, requestsByToken)
 
 	const seenTokens = new Set<string>()
-	while (tokens.size > 0) {
-		const nextToken = tokens.values().next().value as string | undefined
+	const MAX_CONTINUATIONS = 1000
+	while (requestsByToken.size > 0) {
+		if (seenTokens.size >= MAX_CONTINUATIONS) {
+			break
+		}
+		const nextToken = requestsByToken.keys().next().value as string | undefined
 		if (!nextToken) break
-		tokens.delete(nextToken)
+		const nextRequest = requestsByToken.get(nextToken)
+		requestsByToken.delete(nextToken)
+		if (!nextRequest) continue
 		if (seenTokens.has(nextToken)) continue
 		seenTokens.add(nextToken)
 
-		const continuationJson = await fetchBrowseContinuation(apiKey, clientVersion, nextToken)
-		collectPlaylistArtifacts(continuationJson, videosById, tokens)
+		const continuationJson = await fetchBrowseContinuation(
+			apiKey,
+			clientVersion,
+			nextRequest,
+			visitorData
+		)
+		collectPlaylistArtifacts(continuationJson, videosById, requestsByToken)
+	}
+
+	// Fallback "scroll and accumulate" pass: use playlist browseId directly.
+	// This covers cases where page-derived data stalls around the first chunk.
+	if (videosById.size <= 100) {
+		const beforeFallbackCount = videosById.size
+		const browseByIdJson = await fetchBrowseByPlaylistId(apiKey, clientVersion, playlistId, visitorData)
+		collectPlaylistArtifacts(browseByIdJson, videosById, requestsByToken)
+
+		while (requestsByToken.size > 0) {
+			if (seenTokens.size >= MAX_CONTINUATIONS) {
+				break
+			}
+			const nextToken = requestsByToken.keys().next().value as string | undefined
+			if (!nextToken) break
+			const nextRequest = requestsByToken.get(nextToken)
+			requestsByToken.delete(nextToken)
+			if (!nextRequest) continue
+			if (seenTokens.has(nextToken)) continue
+			seenTokens.add(nextToken)
+
+			const continuationJson = await fetchBrowseContinuation(
+				apiKey,
+				clientVersion,
+				nextRequest,
+				visitorData
+			)
+			collectPlaylistArtifacts(continuationJson, videosById, requestsByToken)
+		}
+
+		// If fallback did not add anything, continue gracefully with what we have.
+		if (videosById.size === beforeFallbackCount) {
+			// no-op
+		}
 	}
 
 	const videos = Array.from(videosById.entries()).map(([videoId, title]) => ({

@@ -1,20 +1,89 @@
-{
-    "documentId": "b2ca723d-741d-4665-98e9-fd9464734a74",
-    "shapeId": "shape:arijv1WYs7m-OA_WfaiuN",
-    "rawPointsCount": 568,
-    "pressurePointsCount": 651,
-    "pressureMin": 0,
-    "pressureMax": 1,
-    "pressureMean": 0.604,
-    "opacityMin": 0.06,
-    "opacityMax": 0.95,
-    "opacityMean": 0.5,
-    "opacityBuckets": [
-        189,
-        143,
-        41,
-        40,
-        238
-    ],
-    "opacityBucketsCsv": "189,143,41,40,238"
-}
+plugin:tldraw:145150 Uncaught ReferenceError: Cannot access 'pencilRectangleStampEnabled' before initialization
+    at TldrawApp (plugin:tldraw:145150:6)
+    at renderWithHooks (plugin:tldraw:13588:26)
+    at mountIndeterminateComponent (plugin:tldraw:16966:21)
+    at beginWork (plugin:tldraw:17954:22)
+    at HTMLUnknownElement.callCallback2 (plugin:tldraw:5672:22)
+    at Object.invokeGuardedCallbackDev (plugin:tldraw:5697:24)
+    at invokeGuardedCallback (plugin:tldraw:5731:39)
+    at beginWork$1 (plugin:tldraw:21810:15)
+    at performUnitOfWork (plugin:tldraw:21246:20)
+    at workLoopSync (plugin:tldraw:21182:13)
+TldrawApp @ plugin:tldraw:145150
+renderWithHooks @ plugin:tldraw:13588
+mountIndeterminateComponent @ plugin:tldraw:16966
+beginWork @ plugin:tldraw:17954
+callCallback2 @ plugin:tldraw:5672
+invokeGuardedCallbackDev @ plugin:tldraw:5697
+invokeGuardedCallback @ plugin:tldraw:5731
+beginWork$1 @ plugin:tldraw:21810
+performUnitOfWork @ plugin:tldraw:21246
+workLoopSync @ plugin:tldraw:21182
+renderRootSync @ plugin:tldraw:21161
+performConcurrentWorkOnRoot @ plugin:tldraw:20720
+workLoop @ plugin:tldraw:2185
+flushWork @ plugin:tldraw:2164
+performWorkUntilDeadline @ plugin:tldraw:2372
+processImmediate @ node:internal/timers:485
+plugin:tldraw:145150 Uncaught ReferenceError: Cannot access 'pencilRectangleStampEnabled' before initialization
+    at TldrawApp (plugin:tldraw:145150:6)
+    at renderWithHooks (plugin:tldraw:13588:26)
+    at mountIndeterminateComponent (plugin:tldraw:16966:21)
+    at beginWork (plugin:tldraw:17954:22)
+    at HTMLUnknownElement.callCallback2 (plugin:tldraw:5672:22)
+    at Object.invokeGuardedCallbackDev (plugin:tldraw:5697:24)
+    at invokeGuardedCallback (plugin:tldraw:5731:39)
+    at beginWork$1 (plugin:tldraw:21810:15)
+    at performUnitOfWork (plugin:tldraw:21246:20)
+    at workLoopSync (plugin:tldraw:21182:13)
+TldrawApp @ plugin:tldraw:145150
+renderWithHooks @ plugin:tldraw:13588
+mountIndeterminateComponent @ plugin:tldraw:16966
+beginWork @ plugin:tldraw:17954
+callCallback2 @ plugin:tldraw:5672
+invokeGuardedCallbackDev @ plugin:tldraw:5697
+invokeGuardedCallback @ plugin:tldraw:5731
+beginWork$1 @ plugin:tldraw:21810
+performUnitOfWork @ plugin:tldraw:21246
+workLoopSync @ plugin:tldraw:21182
+renderRootSync @ plugin:tldraw:21161
+recoverFromConcurrentError @ plugin:tldraw:20778
+performConcurrentWorkOnRoot @ plugin:tldraw:20726
+workLoop @ plugin:tldraw:2185
+flushWork @ plugin:tldraw:2164
+performWorkUntilDeadline @ plugin:tldraw:2372
+processImmediate @ node:internal/timers:485
+plugin:tldraw:16072 The above error occurred in the <TldrawApp> component:
+
+    at TldrawApp (plugin:tldraw:144703:3)
+    at TldrawInObsidianPluginProvider (plugin:tldraw:139270:3)
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+logCapturedError @ plugin:tldraw:16072
+update.callback @ plugin:tldraw:16092
+callCallback @ plugin:tldraw:13288
+commitUpdateQueue @ plugin:tldraw:13305
+commitLayoutEffectOnFiber @ plugin:tldraw:19133
+commitLayoutMountEffects_complete @ plugin:tldraw:20022
+commitLayoutEffects_begin @ plugin:tldraw:20011
+commitLayoutEffects @ plugin:tldraw:19962
+commitRootImpl @ plugin:tldraw:21398
+commitRoot @ plugin:tldraw:21322
+finishConcurrentRender @ plugin:tldraw:20805
+performConcurrentWorkOnRoot @ plugin:tldraw:20760
+workLoop @ plugin:tldraw:2185
+flushWork @ plugin:tldraw:2164
+performWorkUntilDeadline @ plugin:tldraw:2372
+processImmediate @ node:internal/timers:485
+plugin:tldraw:145150 Uncaught ReferenceError: Cannot access 'pencilRectangleStampEnabled' before initialization
+    at TldrawApp (plugin:tldraw:145150:6)
+    at renderWithHooks (plugin:tldraw:13588:26)
+    at mountIndeterminateComponent (plugin:tldraw:16966:21)
+    at beginWork (plugin:tldraw:17954:22)
+    at beginWork$1 (plugin:tldraw:21798:22)
+    at performUnitOfWork (plugin:tldraw:21246:20)
+    at workLoopSync (plugin:tldraw:21182:13)
+    at renderRootSync (plugin:tldraw:21161:15)
+    at recoverFromConcurrentError (plugin:tldraw:20778:28)
+    at performConcurrentWorkOnRoot (plugin:tldraw:20726:30)

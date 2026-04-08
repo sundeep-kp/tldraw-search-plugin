@@ -28,6 +28,7 @@ export const PLUGIN_ACTION_TOGGLE_ZOOM_LOCK = 'toggle-zoom-lock'
 export const PLUGIN_ACTION_HANDWRITING_SEARCH = 'handwriting-search'
 export const PLUGIN_ACTION_ASSIGN_ANCHOR_STICKER = 'assign-anchor-sticker'
 export const PLUGIN_ACTION_OPEN_EMBED_IN_NEW_TAB = 'open-embed-in-new-tab'
+export const PLUGIN_ACTION_CAPTURE_SELECTION_STAMP = 'capture-selection-stamp'
 
 export function uiOverrides(plugin: TldrawPlugin): TLUiOverrides {
 	const trackEvent = useUiEvents()
@@ -135,6 +136,21 @@ export function uiOverrides(plugin: TldrawPlugin): TLUiOverrides {
 					if (typeof url !== 'string' || url.length === 0) return
 
 					window.open(url, '_blank', 'noopener,noreferrer')
+				},
+			}
+
+			actions[PLUGIN_ACTION_CAPTURE_SELECTION_STAMP] = {
+				id: PLUGIN_ACTION_CAPTURE_SELECTION_STAMP,
+				label: {
+					default: 'Use selection as brush stamp',
+				},
+				icon: 'tool-pencil',
+				readonlyOk: false,
+				disabled() {
+					return editor.getSelectedShapeIds().size === 0
+				},
+				onSelect() {
+					plugin.onTriggerCaptureSelectionStamp?.()
 				},
 			}
 

@@ -57,8 +57,8 @@ import {
 	releaseDocumentAnchorStickerScope,
 } from 'src/tldraw/anchorStickerStore'
 import {
+	PLUGIN_ACTION_CAPTURE_SELECTION_STAMP,
 	PLUGIN_ACTION_TOGGLE_ZOOM_LOCK,
-	PLUGIN_ACTION_HANDWRITING_SEARCH,
 	uiOverrides,
 } from 'src/tldraw/ui-overrides'
 import { TLDataDocumentStore } from 'src/utils/document'
@@ -77,19 +77,25 @@ import {
 	DefaultToolbarContent,
 	DefaultMainMenu,
 	DefaultMainMenuContent,
+	DefaultContextMenu,
+	DefaultContextMenuContent,
 	Editor,
 	TLAnyShapeUtilConstructor,
-	type TLDefaultSizeStyle,
 	TLComponents,
 	Tldraw,
 	DEFAULT_EMBED_DEFINITIONS,
 	type TLEmbedDefinition,
 	TldrawEditorStoreProps,
 	TldrawUiMenuItem,
+	TldrawUiMenuActionItem,
+	TldrawUiMenuGroup,
 	TldrawUiMenuSubmenu,
 	TldrawUiSlider,
 	TLStateNodeConstructor,
 	TLStoreSnapshot,
+	type TLDrawShape,
+	type TLEmbedShape,
+	type TLShapeId,
 	TLUiAssetUrlOverrides,
 	TLUiEventHandler,
 	TLUiOverrides,
@@ -99,25 +105,27 @@ import {
 	useIsToolSelected,
 	useRelevantStyles,
 	useTranslation,
+	useValue,
 	useActions,
 	useTools,
 } from 'tldraw'
 import {
-	PENCIL_SHAPE_UTILS,
 	setPencilBaseStrokeEnabled,
 	setPencilDefaultStrokeEnabled,
 	setPencilFallbackStylingEnabled,
 	setPencilCrossSectionAspectRatio,
 	setPencilOpacitySensitivity,
 	setPencilSampledOverlayEnabled,
+	activeBrushTipRef,
 } from 'src/tldraw/rendering/pencil-draw-shape-util'
-import { getPressureOpacityStyle } from 'src/tldraw/rendering/pencil-texture'
+import { applyGrainToDab, getPressureOpacityStyle } from 'src/tldraw/rendering/pencil-texture'
 import PluginKeyboardShortcutsDialog from './PluginKeyboardShortcutsDialog'
 import PluginQuickActions from './PluginQuickActions'
 import {
 	extractYoutubePlaylistVideoIds,
 	getYoutubePlaylistIdFromUrl,
 } from 'src/obsidian/youtube/playlist-extractor'
+import { generateFallbackTip } from 'src/obsidian/krita/fallback-tips'
 
 type TldrawAppOptions = {
 	iconAssetUrls?: TLUiAssetUrlOverrides['icons']
@@ -182,26 +190,70 @@ export type TldrawAppProps = {
 	targetDocument: Document
 }
 
+type BrushProfile = {
+	baseSize: number
+	spacingFactor: number
+	sizeCurveExponent: number
+	opacityCurveExponent: number
+	rotationJitter: number
+	baseOpacity: number
+	pencilCrossSectionAspectRatio: number
+	pencilTextureIntensity: number
+}
+
+type KritaPresetDerivedStyle = {
+	pencilBrushSizePx: number
+	pencilOpacitySensitivity: number
+	pencilTextureIntensity: number
+	pencilCrossSectionAspectRatio: number
+	pencilTextureEnabled: boolean
+	brushTipData: Uint8Array | null
+	spacingFactor: number
+	sizeCurveExponent: number
+	opacityCurveExponent: number
+	rotationJitter: number
+}
+
+type KritaBrushRuntimeContextValue = {
+	brushTipCache: React.RefObject<Map<string, ImageBitmap>>
+	activeBrushTip: React.RefObject<ImageBitmap | null>
+	activeBrushProfile: React.RefObject<BrushProfile | null>
+	activeStampShapeMode: React.RefObject<'auto' | 'circle' | 'rectangle'>
+	selectedPresetId: string | null
+	customStampPreset: { id: string; label: string } | null
+	committedCanvasRef: React.RefObject<HTMLCanvasElement | null>
+	activeCanvasRef: React.RefObject<HTMLCanvasElement | null>
+	applyPresetSelection: (
+		presetId: string,
+		presetName: string,
+		derivedStyle: KritaPresetDerivedStyle
+	) => void
+	activateCustomStamp: () => void
+	setStampShapeMode: (mode: 'auto' | 'circle' | 'rectangle') => void
+	captureSelectedShapeAsStamp: () => void
+}
+
+const KritaBrushRuntimeContext = React.createContext<KritaBrushRuntimeContextValue | null>(null)
+
 // https://github.com/tldraw/tldraw/blob/58890dcfce698802f745253ca42584731d126cc3/apps/examples/src/examples/custom-main-menu/CustomMainMenuExample.tsx
-const components = (plugin: TldrawPlugin): TLComponents => ({
+const components = (_plugin: TldrawPlugin): TLComponents => ({
 	MainMenu: () => (
 		<DefaultMainMenu>
-			<LocalFileMenu plugin={plugin} />
+			<LocalFileMenu />
 			<DefaultMainMenuContent />
 		</DefaultMainMenu>
 	),
+	ContextMenu: PluginContextMenu,
 	StylePanel: PluginStylePanel,
 	Toolbar: PluginToolbar,
 	KeyboardShortcutsDialog: PluginKeyboardShortcutsDialog,
 	QuickActions: PluginQuickActions,
 })
 
-const BRUSH_SIZE_STEPS: TLDefaultSizeStyle[] = ['s', 'm', 'l', 'xl']
 const PENCIL_BRUSH_MIN_PX = 1
 const PENCIL_BRUSH_MAX_PX = 600
 const DEFAULT_PENCIL_BRUSH_PX = 24
 const PENCIL_SCRUB_PX_PER_SCREEN_PIXEL = 0.25
-const PENCIL_POST_SCRUB_RESUME_DISTANCE_PX = 3
 
 const ANY_WEBSITE_EMBED_DEFINITION: TLEmbedDefinition = {
 	type: 'website',
@@ -303,6 +355,12 @@ function deriveKritaPresetStyle(presetName: string, presetPath: string) {
 		pencilOpacitySensitivity: Math.max(0, pencilOpacitySensitivity),
 		pencilTextureIntensity: Math.max(0, Math.min(1, pencilTextureIntensity)),
 		pencilCrossSectionAspectRatio: Math.max(1, Math.min(12, pencilCrossSectionAspectRatio)),
+			pencilTextureEnabled: true,
+			brushTipData: null,
+			spacingFactor: 0.2,
+			sizeCurveExponent: 0.7,
+			opacityCurveExponent: 1.2,
+			rotationJitter: 0,
 	}
 }
 
@@ -327,10 +385,6 @@ function PencilBrushSizeSlider() {
 	const size = styles.get(DefaultSizeStyle)
 	if (!size) return null
 
-	const currentIndex =
-		size.type === 'mixed'
-			? BRUSH_SIZE_STEPS.length - 1
-			: Math.max(0, BRUSH_SIZE_STEPS.indexOf(size.value))
 	const configuredBrushPx = clampBrushPx(
 		userSettings.handwritingRecognition?.pencilBrushSizePx ?? DEFAULT_PENCIL_BRUSH_PX
 	)
@@ -348,7 +402,7 @@ function PencilBrushSizeSlider() {
 					editor.run(() => {
 						const selectedDrawShapes = editor
 							.getSelectedShapes()
-							.filter((shape): shape is { id: string; type: 'draw'; props: { scale?: number } } => shape.type === 'draw')
+							.filter((shape): shape is TLDrawShape => shape.type === 'draw')
 
 						if (selectedDrawShapes.length > 0) {
 							editor.updateShapes(
@@ -388,20 +442,18 @@ type KritaPresetOption = {
 	label: string
 	bundleName: string
 	path: string
-	derivedStyle?: {
-		pencilBrushSizePx: number
-		pencilOpacitySensitivity: number
-		pencilTextureIntensity: number
-		pencilCrossSectionAspectRatio: number
-		pencilTextureEnabled: boolean
-	}
+	derivedStyle?: KritaPresetDerivedStyle
 }
+
+type KritaStampShapeMode = 'auto' | 'circle' | 'rectangle'
 
 function KritaBrushPresetPanel() {
 	const plugin = useTldrawPlugin()
+	const runtime = React.useContext(KritaBrushRuntimeContext)
 	const tools = useTools()
 	const isPencilSelected = useIsToolSelected(tools.pencil)
 	const userSettings = useUserPluginSettings(plugin.settingsManager)
+	const listRef = React.useRef<HTMLDivElement | null>(null)
 
 	const presets = React.useMemo<KritaPresetOption[]>(() => {
 		const bundles = userSettings.kritaBrushBundles ?? []
@@ -426,11 +478,23 @@ function KritaBrushPresetPanel() {
 		return options
 	}, [userSettings.kritaBrushBundles])
 
-	const selectedPresetId = userSettings.handwritingRecognition?.kritaSelectedPresetId
+	const selectedPresetId = runtime?.selectedPresetId ?? userSettings.handwritingRecognition?.kritaSelectedPresetId ?? null
+	const selectedStampShapeMode: KritaStampShapeMode =
+		(userSettings.handwritingRecognition?.kritaStampShape as KritaStampShapeMode | undefined) ?? 'auto'
+
+	const onBrushListWheel = React.useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+		const list = listRef.current
+		if (!list) return
+		event.stopPropagation()
+		if (Math.abs(event.deltaY) < 0.01) return
+		list.scrollBy({ top: event.deltaY })
+		event.preventDefault()
+	}, [])
 
 	const onSelectPreset = React.useCallback(
 		(preset: KritaPresetOption) => {
 			const derivedStyle = preset.derivedStyle ?? deriveKritaPresetStyle(preset.label, preset.path)
+			runtime?.applyPresetSelection(preset.id, preset.label, derivedStyle)
 			plugin.settingsManager.settings.handwritingRecognition = {
 				...(plugin.settingsManager.settings.handwritingRecognition ?? {}),
 				kritaSelectedPresetId: preset.id,
@@ -442,15 +506,67 @@ function KritaBrushPresetPanel() {
 			}
 			void plugin.settingsManager.updateSettings(plugin.settingsManager.settings)
 		},
-		[plugin.settingsManager]
+		[plugin.settingsManager, runtime]
+	)
+
+	const onSelectCustomStamp = React.useCallback(() => {
+		runtime?.activateCustomStamp()
+	}, [runtime])
+
+	const onSelectStampShapeMode = React.useCallback(
+		(mode: KritaStampShapeMode) => {
+			runtime?.setStampShapeMode(mode)
+			plugin.settingsManager.settings.handwritingRecognition = {
+				...(plugin.settingsManager.settings.handwritingRecognition ?? {}),
+				kritaStampShape: mode,
+			}
+			void plugin.settingsManager.updateSettings(plugin.settingsManager.settings)
+		},
+		[plugin.settingsManager, runtime]
 	)
 
 	if (!isPencilSelected) return null
 
 	return (
 		<div className="ptl-krita-brush-panel">
-			<div className="ptl-krita-brush-panel-header">Krita brushes ({presets.length})</div>
-			<div className="ptl-krita-brush-list" role="listbox" aria-label="Krita brush presets">
+			<div className="ptl-krita-brush-panel-header">
+				Krita brushes ({presets.length + (runtime?.customStampPreset ? 1 : 0)})
+			</div>
+			<div className="ptl-krita-stamp-mode" role="group" aria-label="Stamp shape mode">
+				{([
+					['auto', 'Auto'],
+					['circle', 'Circle'],
+					['rectangle', 'Rectangle'],
+				] as const).map(([mode, label]) => (
+					<button
+						key={mode}
+						type="button"
+						className="ptl-krita-stamp-mode-button"
+						data-selected={selectedStampShapeMode === mode}
+						onClick={() => onSelectStampShapeMode(mode)}
+					>
+						{label}
+					</button>
+				))}
+			</div>
+			<div
+				ref={listRef}
+				className="ptl-krita-brush-list"
+				role="listbox"
+				aria-label="Krita brush presets"
+				onWheel={onBrushListWheel}
+			>
+				{runtime?.customStampPreset ? (
+					<button
+						type="button"
+						className="ptl-krita-brush-item"
+						data-selected={selectedPresetId === runtime.customStampPreset.id}
+						onClick={onSelectCustomStamp}
+					>
+						<span className="ptl-krita-brush-item-name">{runtime.customStampPreset.label}</span>
+						<span className="ptl-krita-brush-item-bundle">Captured from selection</span>
+					</button>
+				) : null}
 				{presets.length === 0 ? (
 					<div className="ptl-krita-brush-empty">Import a Krita bundle to see presets here.</div>
 				) : (
@@ -472,6 +588,25 @@ function KritaBrushPresetPanel() {
 				)}
 			</div>
 		</div>
+	)
+}
+
+function CustomContextMenuContent() {
+	return (
+		<>
+			<DefaultContextMenuContent />
+			<TldrawUiMenuGroup id="capture-stamp">
+				<TldrawUiMenuActionItem actionId={PLUGIN_ACTION_CAPTURE_SELECTION_STAMP} />
+			</TldrawUiMenuGroup>
+		</>
+	)
+}
+
+function PluginContextMenu() {
+	return (
+		<DefaultContextMenu>
+			<CustomContextMenuContent />
+		</DefaultContextMenu>
 	)
 }
 
@@ -506,7 +641,7 @@ function PluginToolbar() {
 	)
 }
 
-function LocalFileMenu(props: { plugin: TldrawPlugin }) {
+function LocalFileMenu() {
 	const actions = useActions()
 
 	return (
@@ -541,7 +676,7 @@ type SearchPanelResult = {
 }
 
 type AnchorStickerOverlay = {
-	shapeId: string
+	shapeId: TLShapeId
 	targetPath: string
 	targetDisplay: string
 	targetWikilink: string
@@ -562,7 +697,7 @@ type UrlPasteDialogState = {
 }
 
 type YoutubeEmbedSelection = {
-	shapeId: string
+	shapeId: TLShapeId
 	url: string
 	playlistId?: string
 	videoId?: string
@@ -580,13 +715,40 @@ type PlaylistHoverPreview = {
 	top: number
 }
 
+type EmbedPinToCameraState = {
+	shapeId: TLShapeId
+	viewportX: number
+	viewportY: number
+	screenW: number
+	screenH: number
+	originalW: number
+	originalH: number
+}
+
+type YoutubePlayerHudState = {
+	currentTime: number
+	duration: number
+	playerState: number
+	title: string
+	muted: boolean
+	playbackRate: number
+	availablePlaybackRates: number[]
+}
+
+type YoutubeControlsOverlayPosition = {
+	left: number
+	top: number
+	width: number
+	scale: number
+}
+
 const DEFAULT_SEARCH_FOCUS_MIN_SIZE = 64
 const SEARCH_FOCUS_PADDING = 20
 const ANCHOR_MENTIONS_FRONTMATTER_KEY = 'tldraw-canvas-mentions'
 const ANCHOR_MENTION_TOKENS_FRONTMATTER_KEY = 'tldraw-canvas-mention-shapes'
 
-function createAnchorShapeId() {
-	return `shape:anchor-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+function createAnchorShapeId(): TLShapeId {
+	return `shape:anchor-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}` as TLShapeId
 }
 
 function resolveAnchorPlacementPoint(editor: Editor): { x: number; y: number } {
@@ -670,6 +832,40 @@ function buildYoutubeThumbnailUrl(videoId?: string): string | undefined {
 	return `https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/mqdefault.jpg`
 }
 
+function buildYoutubeScrubPreviewUrl(videoId: string, fraction: number): string {
+	const frameIndex = Math.max(0, Math.min(3, Math.floor(clampUnit(fraction) * 4)))
+	return `https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/${frameIndex}.jpg`
+}
+
+function buildYoutubeApiEmbedUrl(url: string): string {
+	try {
+		const ids = parseYoutubeIds(url)
+		if (!ids.videoId) return url
+
+		// Keep playlist context while forcing iframe API support for custom controls.
+		const embed = new URL(`https://www.youtube.com/embed/${encodeURIComponent(ids.videoId)}`)
+		if (ids.playlistId) embed.searchParams.set('list', ids.playlistId)
+		embed.searchParams.set('enablejsapi', '1')
+		embed.searchParams.set('playsinline', '1')
+		embed.searchParams.set('controls', '0')
+		embed.searchParams.set('rel', '0')
+		embed.searchParams.set('modestbranding', '1')
+		embed.searchParams.set('origin', globalThis.location?.origin ?? 'https://obsidian.md')
+		return embed.toString()
+	} catch {
+		return url
+	}
+}
+
+function formatYoutubeTime(seconds: number): string {
+	const safe = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0
+	const h = Math.floor(safe / 3600)
+	const m = Math.floor((safe % 3600) / 60)
+	const s = safe % 60
+	if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+	return `${m}:${String(s).padStart(2, '0')}`
+}
+
 function normalizeYoutubeVideoEntry(raw: string): string | undefined {
 	const trimmed = raw.trim()
 	if (!trimmed) return
@@ -689,6 +885,27 @@ function buildPlaylistStorageKey(documentId: string, shapeId: string): string {
 
 function buildPlaylistLastOpenedStorageKey(documentId: string, shapeId: string): string {
 	return `ptl.youtube-playlist.last-opened.v1:${documentId}:${shapeId}`
+}
+
+function getEmbedPageSize(shape: unknown): { w: number; h: number } {
+	const candidate = shape as { props?: { w?: number; h?: number } } | undefined
+	const w =
+		typeof candidate?.props?.w === 'number' && Number.isFinite(candidate.props.w)
+			? candidate.props.w
+			: 320
+	const h =
+		typeof candidate?.props?.h === 'number' && Number.isFinite(candidate.props.h)
+			? candidate.props.h
+			: 180
+	return { w, h }
+}
+
+function getEditorViewportScale(editor: Editor): number {
+	const origin = editor.pageToViewport({ x: 0, y: 0 })
+	const oneX = editor.pageToViewport({ x: 1, y: 0 })
+	const scale = Math.abs(oneX.x - origin.x)
+	if (!Number.isFinite(scale) || scale <= 0) return 1
+	return scale
 }
 
 function clampUnit(value: number): number {
@@ -774,7 +991,6 @@ const TldrawApp = ({
 		components: otherComponents,
 		focusOnMount = true,
 		hideUi = false,
-		shapeUtils = PENCIL_SHAPE_UTILS,
 		iconAssetUrls,
 		initialTool,
 		isReadonly = false,
@@ -838,6 +1054,7 @@ const TldrawApp = ({
 	const [isPlaylistPanelOpen, setIsPlaylistPanelOpen] = React.useState(false)
 	const [searchQuery, setSearchQuery] = React.useState('')
 	const [playlistUrlInput, setPlaylistUrlInput] = React.useState('')
+	const [playlistSearchQuery, setPlaylistSearchQuery] = React.useState('')
 	const [playlistInput, setPlaylistInput] = React.useState('')
 	const [playlistLoading, setPlaylistLoading] = React.useState(false)
 	const [playlistStatus, setPlaylistStatus] = React.useState<string | undefined>(undefined)
@@ -848,6 +1065,21 @@ const TldrawApp = ({
 		Record<string, YoutubePlaylistEntry[]>
 	>({})
 	const [playlistHoverPreview, setPlaylistHoverPreview] = React.useState<PlaylistHoverPreview | null>(null)
+	const [embedPinToCamera, setEmbedPinToCamera] = React.useState<EmbedPinToCameraState | null>(null)
+	const [youtubePlayerHud, setYoutubePlayerHud] = React.useState<YoutubePlayerHudState>({
+		currentTime: 0,
+		duration: 0,
+		playerState: -1,
+		title: '',
+		muted: false,
+		playbackRate: 1,
+		availablePlaybackRates: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2],
+	})
+	const [youtubeScrubPreview, setYoutubeScrubPreview] = React.useState<{
+		left: number
+		fraction: number
+		active: boolean
+	} | null>(null)
 	const [pencilScrubHud, setPencilScrubHud] = React.useState<PencilScrubHudState>({
 		active: false,
 		left: 0,
@@ -858,10 +1090,34 @@ const TldrawApp = ({
 	const searchInputRef = React.useRef<HTMLInputElement>(null)
 	const searchPanelRef = React.useRef<HTMLDivElement>(null)
 	const searchResultsRef = React.useRef<HTMLDivElement>(null)
+	const committedCanvasRef = React.useRef<HTMLCanvasElement | null>(null)
+	const activeCanvasRef = React.useRef<HTMLCanvasElement | null>(null)
 	const previousNormalizedSearchQueryRef = React.useRef('')
 	const recognizerRef = React.useRef(createHandwritingRecognizer({ engine: 'stub' }))
 	const recognitionDebounceTimerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 	const recognitionRunVersionRef = React.useRef(0)
+	const brushTipCache = React.useRef<Map<string, ImageBitmap>>(new Map())
+	const activeBrushTip = React.useRef<ImageBitmap | null>(null)
+	const activeBrushProfile = React.useRef<BrushProfile | null>(null)
+	const activeStampShapeMode = React.useRef<'auto' | 'circle' | 'rectangle'>('auto')
+	const customStampBitmapRef = React.useRef<ImageBitmap | null>(null)
+	const [activeStampShapeModeState, setActiveStampShapeModeState] = React.useState<
+		'auto' | 'circle' | 'rectangle'
+	>('auto')
+	const activePresetIdRef = React.useRef<string | null>(null)
+	const [runtimeSelectedPresetId, setRuntimeSelectedPresetId] = React.useState<string | null>(null)
+	const [runtimeCustomStampPreset, setRuntimeCustomStampPreset] = React.useState<{
+		id: string
+		label: string
+	} | null>(null)
+	const lastDabXRef = React.useRef(0)
+	const lastDabYRef = React.useRef(0)
+	const lastPressureRef = React.useRef(0.5)
+	const lastTimestampRef = React.useRef(0)
+	const remainderDistRef = React.useRef(0)
+	const isDrawingRef = React.useRef(false)
+	const activePointerIdRef = React.useRef<number | null>(null)
+	const saveTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 	const suppressScrubArtifactUntilRef = React.useRef(0)
 	const scrubCanceledShapeIdsRef = React.useRef(new Set<string>())
 	const bootstrappedRecognitionByDocumentRef = React.useRef(new Set<string>())
@@ -869,6 +1125,7 @@ const TldrawApp = ({
 		((choice: 'iframe' | 'text' | 'cancel') => void) | null
 	>(null)
 	const playlistAutoImportKeyRef = React.useRef<string | null>(null)
+	const youtubeIframeRef = React.useRef<HTMLIFrameElement | null>(null)
 	const handwritingDocumentId = React.useMemo(() => {
 		if (store && 'plugin' in store && store.plugin) {
 			return store.plugin.meta.uuid
@@ -902,6 +1159,19 @@ const TldrawApp = ({
 				ownerDocument.body
 			  )
 			: null
+
+	const youtubePlaybackFraction =
+		youtubePlayerHud.duration > 0
+			? clampUnit(youtubePlayerHud.currentTime / youtubePlayerHud.duration)
+			: 0
+	const youtubePreviewTime =
+		youtubeScrubPreview && youtubePlayerHud.duration > 0
+			? youtubePlayerHud.duration * clampUnit(youtubeScrubPreview.fraction)
+			: 0
+	const youtubePreviewThumbnailUrl =
+		youtubeScrubPreview?.active && selectedYoutubeEmbed?.videoId
+			? buildYoutubeScrubPreviewUrl(selectedYoutubeEmbed.videoId, youtubeScrubPreview.fraction)
+			: undefined
 
 	const setFocusedEditor = (isMounting: boolean, editor?: Editor) => {
 		const { currTldrawEditor } = plugin
@@ -954,6 +1224,898 @@ const TldrawApp = ({
 		resolve?.(choice)
 	}, [])
 
+	const toBrushTipBytes = React.useCallback((value: unknown): Uint8Array | null => {
+		if (!value) return null
+		if (value instanceof Uint8Array) return value
+		if (Array.isArray(value)) {
+			const valid = value.every((entry) => Number.isFinite(entry))
+			return valid ? Uint8Array.from(value as number[]) : null
+		}
+		if (ArrayBuffer.isView(value)) {
+			const view = value as ArrayBufferView
+			return new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
+		}
+		if (typeof value === 'object') {
+			const candidate = value as { [key: string]: unknown; length?: unknown }
+			if (typeof candidate.length === 'number' && Number.isFinite(candidate.length)) {
+				const entries: number[] = []
+				for (let i = 0; i < candidate.length; i++) {
+					const point = candidate[String(i)]
+					if (!Number.isFinite(point)) return null
+					entries.push(Number(point))
+				}
+				return Uint8Array.from(entries)
+			}
+		}
+		return null
+	}, [])
+
+	React.useEffect(() => {
+		const mode = userSettings.handwritingRecognition?.kritaStampShape
+		const resolvedMode = mode === 'circle' || mode === 'rectangle' ? mode : 'auto'
+		activeStampShapeMode.current = resolvedMode
+		setActiveStampShapeModeState(resolvedMode)
+	}, [userSettings.handwritingRecognition?.kritaStampShape])
+
+	React.useEffect(() => {
+		if (activeBrushProfile.current) return
+		activeBrushProfile.current = {
+			baseSize: clampBrushPx(userSettings.handwritingRecognition?.pencilBrushSizePx ?? DEFAULT_PENCIL_BRUSH_PX),
+			spacingFactor: 0.2,
+			sizeCurveExponent: 0.7,
+			opacityCurveExponent: 1.2,
+			rotationJitter: 0,
+			baseOpacity: Math.max(
+				0.02,
+				Math.min(1, (userSettings.handwritingRecognition?.pencilOpacitySensitivity ?? 1) / 2.5)
+			),
+			pencilCrossSectionAspectRatio: Math.max(
+				1,
+				userSettings.handwritingRecognition?.pencilCrossSectionAspectRatio ?? 5
+			),
+			pencilTextureIntensity: Math.max(0, Math.min(1, userSettings.handwritingRecognition?.pencilTextureIntensity ?? 0.35)),
+		}
+	}, [
+		userSettings.handwritingRecognition?.pencilBrushSizePx,
+		userSettings.handwritingRecognition?.pencilOpacitySensitivity,
+		userSettings.handwritingRecognition?.pencilCrossSectionAspectRatio,
+		userSettings.handwritingRecognition?.pencilTextureIntensity,
+	])
+
+	const isPngBytes = React.useCallback((bytes: Uint8Array) => {
+		return (
+			bytes.length >= 8 &&
+			bytes[0] === 0x89 &&
+			bytes[1] === 0x50 &&
+			bytes[2] === 0x4e &&
+			bytes[3] === 0x47 &&
+			bytes[4] === 0x0d &&
+			bytes[5] === 0x0a &&
+			bytes[6] === 0x1a &&
+			bytes[7] === 0x0a
+		)
+	}, [])
+
+	const applyKritaPresetSelection = React.useCallback(
+		(presetId: string, presetName: string, derivedStyle: KritaPresetDerivedStyle) => {
+			activePresetIdRef.current = presetId
+			setRuntimeSelectedPresetId(presetId)
+			const profile: BrushProfile = {
+				baseSize: clampBrushPx(derivedStyle.pencilBrushSizePx),
+				spacingFactor: Math.max(0.01, derivedStyle.spacingFactor ?? 0.2),
+				sizeCurveExponent: Math.max(0.01, derivedStyle.sizeCurveExponent ?? 0.7),
+				opacityCurveExponent: Math.max(0.01, derivedStyle.opacityCurveExponent ?? 1.2),
+				rotationJitter: Math.max(0, Math.min(1, derivedStyle.rotationJitter ?? 0)),
+				baseOpacity: Math.max(0.02, Math.min(1, (derivedStyle.pencilOpacitySensitivity ?? 1) / 2.5)),
+				pencilCrossSectionAspectRatio: Math.max(1, derivedStyle.pencilCrossSectionAspectRatio ?? 5),
+				pencilTextureIntensity: Math.max(0, Math.min(1, derivedStyle.pencilTextureIntensity ?? 0.35)),
+			}
+			activeBrushProfile.current = profile
+
+			const tipBytes = toBrushTipBytes(derivedStyle.brushTipData)
+			if (!tipBytes) {
+				const fallbackKey = `fallback-${presetId}`
+				const cachedFallback = brushTipCache.current.get(fallbackKey)
+				if (cachedFallback) {
+					activeBrushTip.current = cachedFallback
+					return
+				}
+
+				activeBrushTip.current = null
+				void generateFallbackTip(presetName, profile, Math.max(48, Math.round(profile.baseSize * 2.2)))
+					.then((bitmap) => {
+						brushTipCache.current.set(fallbackKey, bitmap)
+						if (activePresetIdRef.current === presetId) {
+							activeBrushTip.current = bitmap
+						}
+					})
+					.catch((error) => {
+						console.warn('[KritaBrush] failed to generate fallback tip', {
+							presetId,
+							error,
+						})
+					})
+				return
+			}
+
+			const cached = brushTipCache.current.get(presetId)
+			if (cached) {
+				activeBrushTip.current = cached
+				return
+			}
+
+			const usePngDecode = isPngBytes(tipBytes)
+			if (!usePngDecode) {
+				// Many Krita bundle tips are GBR/GIH blobs and cannot be decoded by createImageBitmap.
+				const fallbackKey = `fallback-${presetId}`
+				const cachedFallback = brushTipCache.current.get(fallbackKey)
+				if (cachedFallback) {
+					activeBrushTip.current = cachedFallback
+					return
+				}
+				activeBrushTip.current = null
+				void generateFallbackTip(presetName, profile, Math.max(48, Math.round(profile.baseSize * 2.2)))
+					.then((bitmap) => {
+						brushTipCache.current.set(fallbackKey, bitmap)
+						if (activePresetIdRef.current === presetId) {
+							activeBrushTip.current = bitmap
+						}
+					})
+					.catch((error) => {
+						console.warn('[KritaBrush] failed to generate fallback tip', {
+							presetId,
+							error,
+						})
+					})
+				return
+			}
+
+			const normalizedTipBytes = Uint8Array.from(tipBytes)
+			const blob = new Blob([normalizedTipBytes], { type: 'image/png' })
+			void createImageBitmap(blob)
+				.then((bitmap) => {
+					brushTipCache.current.set(presetId, bitmap)
+					if (activePresetIdRef.current === presetId) {
+						activeBrushTip.current = bitmap
+					}
+				})
+				.catch((error) => {
+					console.warn('[KritaBrush] failed to decode brush tip bitmap', {
+						presetId,
+						error,
+					})
+					const fallbackKey = `fallback-${presetId}`
+					const cachedFallback = brushTipCache.current.get(fallbackKey)
+					if (cachedFallback) {
+						activeBrushTip.current = cachedFallback
+						return
+					}
+					activeBrushTip.current = null
+					void generateFallbackTip(presetName, profile, Math.max(48, Math.round(profile.baseSize * 2.2)))
+						.then((bitmap) => {
+							brushTipCache.current.set(fallbackKey, bitmap)
+							if (activePresetIdRef.current === presetId) {
+								activeBrushTip.current = bitmap
+							}
+						})
+						.catch((fallbackError) => {
+							console.warn('[KritaBrush] failed to generate fallback tip after bitmap decode failure', {
+								presetId,
+								error: fallbackError,
+							})
+						})
+				})
+		},
+		[isPngBytes, toBrushTipBytes]
+	)
+
+	const setRuntimeStampShapeMode = React.useCallback((mode: 'auto' | 'circle' | 'rectangle') => {
+		activeStampShapeMode.current = mode
+		setActiveStampShapeModeState(mode)
+	}, [])
+
+	const activateCustomStamp = React.useCallback(() => {
+		const customStamp = runtimeCustomStampPreset
+		if (!customStamp) return
+		const stampBitmap = customStampBitmapRef.current ?? brushTipCache.current.get(customStamp.id) ?? null
+		if (!stampBitmap) {
+			new Notice('Custom stamp is no longer available. Capture a new selection.')
+			return
+		}
+
+		brushTipCache.current.set(customStamp.id, stampBitmap)
+		activeBrushTip.current = stampBitmap
+		activePresetIdRef.current = customStamp.id
+		setRuntimeSelectedPresetId(customStamp.id)
+	}, [runtimeCustomStampPreset])
+
+	const captureSelectedShapeAsStamp = React.useCallback(() => {
+		if (!editor) return
+
+		const selectedShapeIds = Array.from(editor.getSelectedShapeIds())
+		if (selectedShapeIds.length === 0) {
+			new Notice('Select at least one shape to capture as a brush stamp.')
+			return
+		}
+
+		if (!activeBrushProfile.current) {
+			activeBrushProfile.current = {
+				baseSize: clampBrushPx(userSettings.handwritingRecognition?.pencilBrushSizePx ?? DEFAULT_PENCIL_BRUSH_PX),
+				spacingFactor: 0.2,
+				sizeCurveExponent: 0.7,
+				opacityCurveExponent: 1.2,
+				rotationJitter: 0,
+				baseOpacity: Math.max(
+					0.02,
+					Math.min(1, (userSettings.handwritingRecognition?.pencilOpacitySensitivity ?? 1) / 2.5)
+				),
+				pencilCrossSectionAspectRatio: Math.max(
+					1,
+					userSettings.handwritingRecognition?.pencilCrossSectionAspectRatio ?? 5
+				),
+				pencilTextureIntensity: Math.max(0, Math.min(1, userSettings.handwritingRecognition?.pencilTextureIntensity ?? 0.35)),
+			}
+		}
+
+		void (async () => {
+			try {
+				const svgResult = await editor.getSvgString(selectedShapeIds, {
+					background: false,
+					preserveAspectRatio: 'xMidYMid meet',
+					scale: 1,
+				})
+				if (!svgResult?.svg || svgResult.width <= 0 || svgResult.height <= 0) {
+					new Notice('Could not capture selection as stamp.')
+					return
+				}
+
+				const svgBlob = new Blob([svgResult.svg], { type: 'image/svg+xml;charset=utf-8' })
+				const sourceBitmap = await (async () => {
+					try {
+						return await createImageBitmap(svgBlob)
+					} catch (bitmapError) {
+						if (typeof document === 'undefined') throw bitmapError
+						return await new Promise<ImageBitmap>((resolve, reject) => {
+							const objectUrl = URL.createObjectURL(svgBlob)
+							const image = new Image()
+							image.onload = () => {
+								try {
+									const fallbackCanvas = document.createElement('canvas')
+									fallbackCanvas.width = svgResult.width
+									fallbackCanvas.height = svgResult.height
+									const fallbackCtx = fallbackCanvas.getContext('2d')
+									if (!fallbackCtx) {
+										URL.revokeObjectURL(objectUrl)
+										reject(new Error('No drawing context for custom stamp'))
+										return
+									}
+									fallbackCtx.clearRect(0, 0, fallbackCanvas.width, fallbackCanvas.height)
+									fallbackCtx.drawImage(image, 0, 0)
+									URL.revokeObjectURL(objectUrl)
+									createImageBitmap(fallbackCanvas).then(resolve).catch(reject)
+								} catch (error) {
+									URL.revokeObjectURL(objectUrl)
+									reject(error)
+								}
+							}
+							image.onerror = () => {
+								URL.revokeObjectURL(objectUrl)
+								reject(new Error('Failed to decode SVG stamp image'))
+							}
+							image.src = objectUrl
+						})
+					}
+				})()
+
+				const stampSize = 256
+				let stampBitmap: ImageBitmap | null = null
+				if (typeof OffscreenCanvas !== 'undefined') {
+					const canvas = new OffscreenCanvas(stampSize, stampSize)
+					const ctx = canvas.getContext('2d')
+					if (!ctx) throw new Error('No drawing context for custom stamp')
+					ctx.clearRect(0, 0, stampSize, stampSize)
+					const fitScale = Math.min((stampSize * 0.82) / sourceBitmap.width, (stampSize * 0.82) / sourceBitmap.height)
+					const drawW = sourceBitmap.width * fitScale
+					const drawH = sourceBitmap.height * fitScale
+					ctx.drawImage(sourceBitmap, (stampSize - drawW) / 2, (stampSize - drawH) / 2, drawW, drawH)
+					stampBitmap = await createImageBitmap(canvas)
+				} else if (typeof document !== 'undefined') {
+					const canvas = document.createElement('canvas')
+					canvas.width = stampSize
+					canvas.height = stampSize
+					const ctx = canvas.getContext('2d')
+					if (!ctx) throw new Error('No drawing context for custom stamp')
+					ctx.clearRect(0, 0, stampSize, stampSize)
+					const fitScale = Math.min((stampSize * 0.82) / sourceBitmap.width, (stampSize * 0.82) / sourceBitmap.height)
+					const drawW = sourceBitmap.width * fitScale
+					const drawH = sourceBitmap.height * fitScale
+					ctx.drawImage(sourceBitmap, (stampSize - drawW) / 2, (stampSize - drawH) / 2, drawW, drawH)
+					stampBitmap = await createImageBitmap(canvas)
+				}
+
+				sourceBitmap.close()
+				if (!stampBitmap) {
+					new Notice('Custom stamp capture is not supported in this environment.')
+					return
+				}
+
+				const stampId = `custom-shape-stamp:${Date.now()}`
+				const stampLabel = 'Custom stamp'
+				brushTipCache.current.set(stampId, stampBitmap)
+				customStampBitmapRef.current = stampBitmap
+				activeBrushTip.current = stampBitmap
+				activePresetIdRef.current = stampId
+				setRuntimeSelectedPresetId(stampId)
+				setRuntimeCustomStampPreset({ id: stampId, label: stampLabel })
+				setRuntimeStampShapeMode('auto')
+				new Notice('Captured selection as brush stamp.')
+			} catch (error) {
+				console.warn('[KritaBrush] failed capturing selected shape as stamp', error)
+				new Notice('Failed to capture selected shape as stamp.')
+			}
+		})()
+	}, [editor, setRuntimeStampShapeMode, userSettings.handwritingRecognition])
+
+	const kritaBrushRuntimeContext = React.useMemo<KritaBrushRuntimeContextValue>(
+		() => ({
+			brushTipCache: brushTipCache as React.RefObject<Map<string, ImageBitmap>>,
+			activeBrushTip: activeBrushTip as React.RefObject<ImageBitmap | null>,
+			activeBrushProfile: activeBrushProfile as React.RefObject<BrushProfile | null>,
+			activeStampShapeMode: activeStampShapeMode as React.RefObject<'auto' | 'circle' | 'rectangle'>,
+			selectedPresetId: runtimeSelectedPresetId,
+			customStampPreset: runtimeCustomStampPreset,
+			committedCanvasRef: committedCanvasRef as React.RefObject<HTMLCanvasElement | null>,
+			activeCanvasRef: activeCanvasRef as React.RefObject<HTMLCanvasElement | null>,
+			applyPresetSelection: applyKritaPresetSelection,
+			activateCustomStamp,
+			setStampShapeMode: setRuntimeStampShapeMode,
+			captureSelectedShapeAsStamp,
+		}),
+		[
+			activateCustomStamp,
+			applyKritaPresetSelection,
+			captureSelectedShapeAsStamp,
+			runtimeCustomStampPreset,
+			runtimeSelectedPresetId,
+			setRuntimeStampShapeMode,
+		]
+	)
+
+	// Sync active brush tip to module-level ref for use by pencil renderer
+	React.useEffect(() => {
+		activeBrushTipRef.current = activeBrushTip.current
+	}, [activeBrushTip])
+
+	const clearCanvas = React.useCallback((canvas: HTMLCanvasElement) => {
+		const ctx = canvas.getContext('2d')
+		if (!ctx) return
+		ctx.save()
+		ctx.setTransform(1, 0, 0, 1, 0, 0)
+		ctx.clearRect(0, 0, canvas.width, canvas.height)
+		ctx.restore()
+	}, [])
+
+	const toWorldPoint = React.useCallback(
+		(screenX: number, screenY: number) => {
+			if (!editor) return { x: screenX, y: screenY }
+			const cam = editor.getCamera()
+			return {
+				x: (screenX - cam.x) / cam.z,
+				y: (screenY - cam.y) / cam.z,
+			}
+		},
+		[editor]
+	)
+
+	const getCurrentCanvasMarkdownPath = React.useCallback((): string | undefined => {
+		const current = plugin.app.workspace.getActiveFile()
+		if (!current?.path?.endsWith('.md')) return undefined
+		return current.path
+	}, [plugin])
+
+	const clearCommittedCanvas = React.useCallback(() => {
+		const canvas = committedCanvasRef.current
+		if (!canvas) return
+		clearCanvas(canvas)
+	}, [clearCanvas])
+
+	const removeCurrentSidecarFiles = React.useCallback(async () => {
+		const markdownPath = getCurrentCanvasMarkdownPath()
+		if (!markdownPath) return
+		const pngPath = markdownPath.replace(/\.md$/i, '.krita-strokes.png')
+		const jpgPath = markdownPath.replace(/\.md$/i, '.krita-strokes.jpg')
+
+		for (const path of [pngPath, jpgPath]) {
+			try {
+				const exists = await plugin.app.vault.adapter.exists(path)
+				if (exists) await plugin.app.vault.adapter.remove(path)
+			} catch (error) {
+				console.warn('[KritaBrush] failed removing sidecar', { path, error })
+			}
+		}
+	}, [getCurrentCanvasMarkdownPath, plugin])
+
+	const scheduleCommittedCanvasSave = React.useCallback(() => {
+		if (saveTimeoutRef.current) {
+			clearTimeout(saveTimeoutRef.current)
+		}
+
+		saveTimeoutRef.current = setTimeout(async () => {
+			const markdownPath = getCurrentCanvasMarkdownPath()
+			const canvas = committedCanvasRef.current
+			if (!markdownPath || !canvas) return
+
+			const shouldUseJpeg = canvas.width > 4096 || canvas.height > 4096
+			const path = markdownPath.replace(
+				/\.md$/i,
+				shouldUseJpeg ? '.krita-strokes.jpg' : '.krita-strokes.png'
+			)
+			const format = shouldUseJpeg ? 'image/jpeg' : 'image/png'
+			if (shouldUseJpeg) {
+				console.warn('[KritaBrush] saving sidecar as JPEG due to large canvas dimensions', {
+					width: canvas.width,
+					height: canvas.height,
+				})
+			}
+
+			try {
+				const dataUrl = shouldUseJpeg
+					? canvas.toDataURL(format, 0.92)
+					: canvas.toDataURL(format)
+				const base64 = dataUrl.split(',')[1]
+				if (!base64) return
+				const binary = atob(base64)
+				const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
+				const binaryBuffer = bytes.buffer.slice(
+					bytes.byteOffset,
+					bytes.byteOffset + bytes.byteLength
+				)
+				await plugin.app.vault.adapter.writeBinary(path, binaryBuffer)
+
+				const stalePath = markdownPath.replace(
+					/\.md$/i,
+					shouldUseJpeg ? '.krita-strokes.png' : '.krita-strokes.jpg'
+				)
+				try {
+					const staleExists = await plugin.app.vault.adapter.exists(stalePath)
+					if (staleExists) await plugin.app.vault.adapter.remove(stalePath)
+				} catch {
+					// Best effort only.
+				}
+			} catch (error) {
+				console.warn('[KritaBrush] failed writing sidecar', { path, error })
+			}
+		}, 2000)
+	}, [getCurrentCanvasMarkdownPath, plugin])
+
+	const stampDab = React.useCallback(
+		(ctx: CanvasRenderingContext2D, x: number, y: number, pressure: number) => {
+			const profile = activeBrushProfile.current
+			if (!profile) return
+			const tip = activeBrushTip.current
+			const debugRectangleStampEnabled = userSettings.debugLogs?.pencilRectangleStamp ?? false
+			const stampShapeMode = activeStampShapeMode.current
+
+			const safePressure = Math.max(pressure, 0.01)
+			const size = profile.baseSize * Math.pow(safePressure, profile.sizeCurveExponent)
+			const opacity = profile.baseOpacity * Math.pow(safePressure, profile.opacityCurveExponent)
+			const angle = profile.rotationJitter * (Math.random() - 0.5) * 2 * Math.PI
+
+			ctx.save()
+			ctx.globalAlpha = Math.min(opacity, 1)
+			ctx.translate(x, y)
+			ctx.rotate(angle)
+
+			const shouldUseRectangleStamp =
+				debugRectangleStampEnabled || stampShapeMode === 'rectangle'
+			const shouldUseCircleStamp = stampShapeMode === 'circle'
+
+			if (shouldUseRectangleStamp) {
+				ctx.fillStyle = 'rgba(0,0,0,1)'
+				ctx.fillRect(-size / 2, -size / 2, size, size)
+			} else if (tip && !shouldUseCircleStamp) {
+				ctx.drawImage(tip, -size / 2, -size / 2, size, size)
+			} else {
+				const g = ctx.createRadialGradient(0, 0, 0, 0, 0, size / 2)
+				g.addColorStop(0, 'rgba(0,0,0,1)')
+				g.addColorStop(1, 'rgba(0,0,0,0)')
+				ctx.fillStyle = g
+				ctx.beginPath()
+				ctx.arc(0, 0, size / 2, 0, Math.PI * 2)
+				ctx.fill()
+			}
+
+			if (profile.pencilTextureIntensity > 0.05) {
+				applyGrainToDab(ctx, 0, 0, size, profile.pencilTextureIntensity)
+			}
+
+			ctx.restore()
+		},
+		[userSettings.debugLogs?.pencilRectangleStamp]
+	)
+
+	const onCanvasPointerDownCapture = React.useCallback(
+		(e: React.PointerEvent<HTMLDivElement>) => {
+			if (!editor) return
+			if (editor.getCurrentToolId() !== 'pencil') return
+			if (!activeBrushProfile.current) return
+			if (e.button !== 0) return
+
+			const target = e.target as HTMLElement | null
+			if (
+				target?.closest(
+					'.ptl-krita-brush-panel, .ptl-handwriting-search-panel, .ptl-youtube-playlist-panel, .ptl-youtube-custom-controls, .ptl-handwriting-predict-button, .ptl-krita-test-rect-button, .ptl-embed-pin-button, .ptl-anchor-sticker-overlay, .ptl-capture-stamp-button, .ptl-handwriting-batch-text-overlay, .tlui-toolbar, .tlui-menu, .tlui-style-panel'
+				)
+			) {
+				return
+			}
+
+			activePointerIdRef.current = e.pointerId
+			e.currentTarget.setPointerCapture(e.pointerId)
+
+			const activeCanvas = activeCanvasRef.current
+			if (!activeCanvas) return
+			clearCanvas(activeCanvas)
+
+			isDrawingRef.current = true
+			const world = toWorldPoint(e.nativeEvent.offsetX, e.nativeEvent.offsetY)
+			lastDabXRef.current = world.x
+			lastDabYRef.current = world.y
+			lastPressureRef.current = e.pressure || 0.5
+			lastTimestampRef.current = e.timeStamp
+			remainderDistRef.current = 0
+		},
+		[clearCanvas, editor, toWorldPoint]
+	)
+
+	const onCanvasPointerMoveCapture = React.useCallback(
+		(e: React.PointerEvent<HTMLDivElement>) => {
+			if (!editor) return
+			if (editor.getCurrentToolId() !== 'pencil') return
+			if (!isDrawingRef.current || activePointerIdRef.current !== e.pointerId) return
+
+			const profile = activeBrushProfile.current
+			const activeCanvas = activeCanvasRef.current
+			if (!profile || !activeCanvas) return
+
+			const activeCtx = activeCanvas.getContext('2d')
+			if (!activeCtx) return
+
+			const world = toWorldPoint(e.nativeEvent.offsetX, e.nativeEvent.offsetY)
+			const x = world.x
+			const y = world.y
+			const p = e.pressure || 0.5
+
+			let spacing = profile.baseSize * profile.spacingFactor
+			spacing = Math.max(spacing, 1)
+
+			const dx = x - lastDabXRef.current
+			const dy = y - lastDabYRef.current
+			const rawDist = Math.hypot(dx, dy)
+			if (rawDist === 0) {
+				lastPressureRef.current = p
+				lastTimestampRef.current = e.timeStamp
+				return
+			}
+
+			let totalDist = rawDist + remainderDistRef.current
+			let travelled = spacing - remainderDistRef.current
+
+			while (totalDist >= spacing) {
+				const t = Math.max(0, Math.min(1, travelled / rawDist))
+				const dabX = lastDabXRef.current + dx * t
+				const dabY = lastDabYRef.current + dy * t
+				const dabP = lastPressureRef.current + (p - lastPressureRef.current) * t
+				stampDab(activeCtx, dabX, dabY, dabP)
+				totalDist -= spacing
+				travelled += spacing
+			}
+
+			remainderDistRef.current = totalDist
+			lastDabXRef.current = x
+			lastDabYRef.current = y
+			lastPressureRef.current = p
+			lastTimestampRef.current = e.timeStamp
+		},
+		[editor, stampDab, toWorldPoint]
+	)
+
+	const onCanvasPointerUpCapture = React.useCallback(
+		(e: React.PointerEvent<HTMLDivElement>) => {
+			if (!editor) return
+			if (editor.getCurrentToolId() !== 'pencil') return
+			const shouldRelease = e.currentTarget.hasPointerCapture?.(e.pointerId)
+			if (shouldRelease) {
+				e.currentTarget.releasePointerCapture(e.pointerId)
+			}
+			if (activePointerIdRef.current !== e.pointerId) return
+
+			isDrawingRef.current = false
+			activePointerIdRef.current = null
+
+			const committedCanvas = committedCanvasRef.current
+			const activeCanvas = activeCanvasRef.current
+			if (committedCanvas && activeCanvas) {
+				const committedCtx = committedCanvas.getContext('2d')
+				if (committedCtx) {
+					const dpr = window.devicePixelRatio || 1
+					const cssWidth = activeCanvas.width / dpr
+					const cssHeight = activeCanvas.height / dpr
+					committedCtx.drawImage(
+						activeCanvas,
+						0,
+						0,
+						activeCanvas.width,
+						activeCanvas.height,
+						0,
+						0,
+						cssWidth,
+						cssHeight
+					)
+				}
+				clearCanvas(activeCanvas)
+				scheduleCommittedCanvasSave()
+			}
+
+			// Keep draw-shape opacity unchanged so strokes remain visible.
+			// Hiding vector strokes here can make "registered but invisible" behavior.
+		},
+		[clearCanvas, editor, scheduleCommittedCanvasSave]
+	)
+
+	const onCanvasPointerCancelCapture = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+		if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+			e.currentTarget.releasePointerCapture(e.pointerId)
+		}
+		if (activePointerIdRef.current === e.pointerId) {
+			isDrawingRef.current = false
+			activePointerIdRef.current = null
+		}
+	}, [])
+
+	const createCenterInkyRectangleStroke = React.useCallback(() => {
+		if (!editor) return
+
+		const viewportCenter = editor.getViewportPageBounds().center
+		const center = { x: viewportCenter.x, y: viewportCenter.y }
+		const width = 220
+		const height = 140
+		const brushPx = clampBrushPx(
+			userSettings.handwritingRecognition?.pencilBrushSizePx ?? DEFAULT_PENCIL_BRUSH_PX
+		)
+		const scale = getPencilBrushScale(editor, brushPx)
+
+
+		const perimeterStep = 12
+		const localPoints: Array<{ x: number; y: number; z: number }> = []
+		const pushEdgePoints = (x0: number, y0: number, x1: number, y1: number) => {
+			const distance = Math.hypot(x1 - x0, y1 - y0)
+			const count = Math.max(1, Math.ceil(distance / perimeterStep))
+			for (let i = 0; i <= count; i++) {
+				const t = i / count
+				localPoints.push({
+					x: x0 + (x1 - x0) * t,
+					y: y0 + (y1 - y0) * t,
+					z: 0.9,
+				})
+			}
+		}
+
+		pushEdgePoints(0, 0, width, 0)
+		pushEdgePoints(width, 0, width, height)
+		pushEdgePoints(width, height, 0, height)
+		pushEdgePoints(0, height, 0, 0)
+
+		editor.createShape({
+			type: 'draw',
+			x: center.x - width / 2,
+			y: center.y - height / 2,
+			props: {
+				segments: [
+					{
+						type: 'free',
+						points: localPoints,
+					},
+				],
+				color: 'black',
+				fill: 'none',
+				dash: 'draw',
+				size: 'm',
+				isComplete: true,
+				isClosed: false,
+				isPen: false,
+				scale,
+			},
+			meta: {
+				ptlDebugShape: 'inky-rect',
+			},
+		} as never)
+
+		console.log('[KritaBrush] created center inky rectangle stroke', {
+			centerX: center.x,
+			centerY: center.y,
+			width,
+			height,
+			scale,
+		})
+	}, [editor, userSettings.handwritingRecognition?.pencilBrushSizePx])
+
+	const createCenterRawRectangleStroke = React.useCallback(() => {
+		if (!editor) return
+
+		const viewportCenter = editor.getViewportPageBounds().center
+		const center = { x: viewportCenter.x, y: viewportCenter.y }
+		const width = 220
+		const height = 140
+
+		editor.createShape({
+			type: 'geo',
+			x: center.x - width / 2,
+			y: center.y - height / 2,
+			props: {
+				w: width,
+				h: height,
+				geo: 'rectangle',
+				color: 'black',
+				fill: 'none',
+				dash: 'solid',
+				size: 'm',
+			},
+			meta: {
+				ptlDebugShape: 'raw-geo-rect',
+			},
+		} as never)
+
+		console.log('[KritaBrush] created center raw geo rectangle', {
+			centerX: center.x,
+			centerY: center.y,
+			width,
+			height,
+		})
+	}, [editor])
+
+	React.useEffect(() => {
+		const container = editorContainerRef.current
+		if (!container) return
+
+		let disposed = false
+		let resizeInFlight = false
+		let needsAnotherPass = false
+
+		const resizeCanvases = async () => {
+			if (resizeInFlight) {
+				needsAnotherPass = true
+				return
+			}
+
+			resizeInFlight = true
+			do {
+				needsAnotherPass = false
+				if (disposed) break
+
+				const committedCanvas = committedCanvasRef.current
+				const activeCanvas = activeCanvasRef.current
+				if (!committedCanvas || !activeCanvas) break
+
+				const cssWidth = Math.max(1, container.offsetWidth)
+				const cssHeight = Math.max(1, container.offsetHeight)
+				const dpr = window.devicePixelRatio || 1
+				const pixelWidth = Math.max(1, Math.floor(cssWidth * dpr))
+				const pixelHeight = Math.max(1, Math.floor(cssHeight * dpr))
+
+				let snapshot: ImageBitmap | null = null
+				if (committedCanvas.width > 0 && committedCanvas.height > 0) {
+					try {
+						snapshot = await createImageBitmap(committedCanvas)
+					} catch {
+						snapshot = null
+					}
+				}
+
+				for (const canvas of [committedCanvas, activeCanvas]) {
+					canvas.width = pixelWidth
+					canvas.height = pixelHeight
+					const ctx = canvas.getContext('2d')
+					if (!ctx) continue
+					ctx.setTransform(1, 0, 0, 1, 0, 0)
+					ctx.clearRect(0, 0, canvas.width, canvas.height)
+					ctx.scale(dpr, dpr)
+				}
+
+				if (snapshot) {
+					const committedCtx = committedCanvas.getContext('2d')
+					if (committedCtx) {
+						committedCtx.drawImage(snapshot, 0, 0, cssWidth, cssHeight)
+					}
+					snapshot.close()
+				}
+			} while (needsAnotherPass && !disposed)
+
+			resizeInFlight = false
+		}
+
+		const observer = new ResizeObserver(() => {
+			void resizeCanvases()
+		})
+
+		observer.observe(container)
+		void resizeCanvases()
+
+		return () => {
+			disposed = true
+			observer.disconnect()
+		}
+	}, [])
+
+	React.useEffect(() => {
+		if (!editor) return
+
+		const applyCameraTransform = () => {
+			const cam = editor.getCamera()
+			for (const canvas of [committedCanvasRef.current, activeCanvasRef.current]) {
+				if (!canvas) continue
+				canvas.style.transform = `translate(${cam.x}px, ${cam.y}px) scale(${cam.z})`
+				canvas.style.transformOrigin = '0 0'
+			}
+			// TODO: re-rasterize at new zoom for sharpness (future work)
+		}
+
+		applyCameraTransform()
+		editor.on('change', applyCameraTransform)
+		return () => {
+			editor.off('change', applyCameraTransform)
+		}
+	}, [editor])
+
+	React.useEffect(() => {
+		let disposed = false
+
+		const restoreSidecar = async () => {
+			const canvas = committedCanvasRef.current
+			if (!canvas) return
+			const markdownPath = getCurrentCanvasMarkdownPath()
+			if (!markdownPath) return
+
+			const pngPath = markdownPath.replace(/\.md$/i, '.krita-strokes.png')
+			const jpgPath = markdownPath.replace(/\.md$/i, '.krita-strokes.jpg')
+			const path = (await plugin.app.vault.adapter.exists(pngPath))
+				? pngPath
+				: (await plugin.app.vault.adapter.exists(jpgPath))
+					? jpgPath
+					: undefined
+			if (!path || disposed) return
+
+			try {
+				const bytes = await plugin.app.vault.adapter.readBinary(path)
+				if (disposed) return
+				const mimeType = path.endsWith('.jpg') ? 'image/jpeg' : 'image/png'
+				const blob = new Blob([bytes], { type: mimeType })
+				const bitmap = await createImageBitmap(blob)
+				if (disposed) {
+					bitmap.close()
+					return
+				}
+
+				const ctx = canvas.getContext('2d')
+				if (ctx) {
+					const dpr = window.devicePixelRatio || 1
+					const cssWidth = canvas.width / dpr
+					const cssHeight = canvas.height / dpr
+					ctx.drawImage(bitmap, 0, 0, cssWidth, cssHeight)
+				}
+				bitmap.close()
+			} catch (error) {
+				console.warn('[KritaBrush] failed restoring sidecar', { path, error })
+			}
+		}
+
+		void restoreSidecar()
+
+		return () => {
+			disposed = true
+		}
+	}, [editor, getCurrentCanvasMarkdownPath, handwritingDocumentId, plugin])
+
 	React.useEffect(() => {
 		if (!editor) return
 
@@ -985,7 +2147,7 @@ const TldrawApp = ({
 				return editor.putExternalContent({ type: 'text', text: parsed.toString(), point })
 			}
 
-			const embedUtil = editor.getShapeUtil('embed') as
+			const embedUtil = editor.getShapeUtil('embed') as unknown as
 				| { getEmbedDefinition: (url: string) => { url: string; definition: unknown } | undefined }
 				| undefined
 			const embedInfo = embedUtil?.getEmbedDefinition(parsed.toString())
@@ -1007,10 +2169,12 @@ const TldrawApp = ({
 					const matches = editor
 						.getCurrentPageShapes()
 						.filter(
-							(candidate): candidate is { id: string; type: 'embed'; props: { url: string } } =>
-								candidate.type === 'embed' && candidate.props?.url === embedInfo.url
+							(candidate): candidate is TLEmbedShape =>
+								candidate.type === 'embed' &&
+								typeof (candidate.props as { url?: unknown }).url === 'string' &&
+								(candidate.props as { url: string }).url === embedInfo.url
 						)
-					shape = matches.at(-1)
+					shape = matches.at(-1) ?? null
 				}
 
 				if (shape?.type === 'embed') {
@@ -1042,7 +2206,8 @@ const TldrawApp = ({
 				return
 			}
 
-			const url = typeof selected.props?.url === 'string' ? selected.props.url : ''
+			const selectedEmbedProps = selected.props as { url?: unknown }
+			const url = typeof selectedEmbedProps.url === 'string' ? selectedEmbedProps.url : ''
 			const ids = parseYoutubeIds(url)
 			if (!ids.videoId && !ids.playlistId) {
 				setSelectedYoutubeEmbed(null)
@@ -1077,6 +2242,8 @@ const TldrawApp = ({
 		if (!selectedYoutubeEmbed) {
 			setIsPlaylistPanelOpen(false)
 			setPlaylistHoverPreview(null)
+			setPlaylistSearchQuery('')
+			setEmbedPinToCamera(null)
 			return
 		}
 
@@ -1085,6 +2252,47 @@ const TldrawApp = ({
 			setIsPlaylistPanelOpen(true)
 		}
 	}, [selectedYoutubeEmbed])
+
+	React.useEffect(() => {
+		if (!selectedYoutubeEmbed) return
+		const intervalId = window.setInterval(() => {
+			setOverlayRenderTick((tick) => tick + 1)
+		}, 80)
+		return () => window.clearInterval(intervalId)
+	}, [selectedYoutubeEmbed])
+
+	React.useEffect(() => {
+		if (!editor || !embedPinToCamera) return
+
+		const intervalId = window.setInterval(() => {
+			const shape = editor.getShape(embedPinToCamera.shapeId)
+			if (!shape || shape.type !== 'embed') {
+				setEmbedPinToCamera(null)
+				return
+			}
+
+			const containerRect = editor.getContainer().getBoundingClientRect()
+			const targetPagePoint = editor.screenToPage({
+				x: containerRect.left + embedPinToCamera.viewportX,
+				y: containerRect.top + embedPinToCamera.viewportY,
+			})
+
+			const dx = Math.abs(shape.x - targetPagePoint.x)
+			const dy = Math.abs(shape.y - targetPagePoint.y)
+			if (dx < 0.5 && dy < 0.5) return
+
+			editor.updateShapes([
+				{
+					id: shape.id,
+					type: 'embed',
+					x: targetPagePoint.x,
+					y: targetPagePoint.y,
+				},
+			])
+		}, 33)
+
+		return () => window.clearInterval(intervalId)
+	}, [editor, embedPinToCamera])
 
 	React.useEffect(() => {
 		if (!selectedYoutubeEmbed) return
@@ -1230,6 +2438,333 @@ const TldrawApp = ({
 		return parseYoutubeIds(selectedYoutubeEmbed.url)
 	}, [selectedYoutubeEmbed])
 
+	const filteredPlaylistEntries = React.useMemo(() => {
+		if (!selectedYoutubeEmbed) return [] as YoutubePlaylistEntry[]
+		const allEntries = playlistEntriesByShapeId[selectedYoutubeEmbed.shapeId] ?? []
+		const query = playlistSearchQuery.trim().toLowerCase()
+		if (!query) return allEntries
+
+		return allEntries.filter((entry) => {
+			const ids = parseYoutubeIds(entry.url)
+			const label = entry.title?.trim() || ids.videoId || ''
+			return (
+				label.toLowerCase().includes(query) ||
+				(ids.videoId ?? '').toLowerCase().includes(query) ||
+				entry.url.toLowerCase().includes(query)
+			)
+		})
+	}, [playlistEntriesByShapeId, playlistSearchQuery, selectedYoutubeEmbed])
+
+	const selectedEmbedPinButtonPosition = React.useMemo(() => {
+		if (!editor || !selectedYoutubeEmbed) return null
+		const shape = editor.getShape(selectedYoutubeEmbed.shapeId)
+		if (!shape || shape.type !== 'embed') return null
+
+		const shapeWithSize = shape as { x: number; y: number; props?: { w?: number; h?: number } }
+		const width =
+			typeof shapeWithSize.props?.w === 'number' && Number.isFinite(shapeWithSize.props.w)
+				? shapeWithSize.props.w
+				: 320
+		const viewportTopRight = editor.pageToViewport({
+			x: shapeWithSize.x + width,
+			y: shapeWithSize.y,
+		})
+
+		return {
+			left: viewportTopRight.x + 8,
+			top: viewportTopRight.y - 6,
+			isPinned: embedPinToCamera?.shapeId === selectedYoutubeEmbed.shapeId,
+		}
+	}, [editor, embedPinToCamera, overlayRenderTick, selectedYoutubeEmbed])
+
+	const youtubeControlsOverlayPosition = React.useMemo((): YoutubeControlsOverlayPosition | null => {
+		if (!editor || !selectedYoutubeEmbed?.videoId) return null
+		const shape = editor.getShape(selectedYoutubeEmbed.shapeId)
+		if (!shape || shape.type !== 'embed') return null
+
+		const { w, h } = getEmbedPageSize(shape)
+		const topLeft = editor.pageToViewport({ x: shape.x, y: shape.y })
+		const bottomRight = editor.pageToViewport({ x: shape.x + w, y: shape.y + h })
+		const viewportWidth = Math.max(120, bottomRight.x - topLeft.x)
+		const viewportHeight = Math.max(80, bottomRight.y - topLeft.y)
+		const horizontalPadding = 12
+		const availableWidth = Math.max(90, viewportWidth - horizontalPadding)
+		const baseWidth = Math.max(220, Math.min(620, availableWidth))
+		const scaleByWidth = availableWidth / baseWidth
+		const scaleByHeight = Math.max(0.45, Math.min(1, viewportHeight / 52))
+		const scale = Math.max(0.45, Math.min(1, Math.min(scaleByWidth, scaleByHeight)))
+		const visualHeight = 44 * scale
+		return {
+			left: topLeft.x + 6,
+			top: topLeft.y + Math.max(2, viewportHeight - visualHeight - 4),
+			width: baseWidth,
+			scale,
+		}
+	}, [editor, overlayRenderTick, selectedYoutubeEmbed])
+
+	React.useEffect(() => {
+		if (!editor || !selectedYoutubeEmbed) return
+		const shape = editor.getShape(selectedYoutubeEmbed.shapeId)
+		if (!shape || shape.type !== 'embed') return
+
+		const currentUrl = (shape.props as { url?: string }).url
+		if (typeof currentUrl !== 'string' || !currentUrl) return
+
+		const ids = parseYoutubeIds(currentUrl)
+		if (!ids.videoId) return
+
+		const nextUrl = buildYoutubeApiEmbedUrl(currentUrl)
+		if (nextUrl === currentUrl) return
+
+		editor.updateShapes([
+			{
+				id: shape.id,
+				type: 'embed',
+				props: { url: nextUrl },
+			},
+		])
+	}, [editor, selectedYoutubeEmbed])
+
+	React.useEffect(() => {
+		if (!editor || !selectedYoutubeEmbed?.videoId) {
+			youtubeIframeRef.current = null
+			return
+		}
+
+		const shape = editor.getShape(selectedYoutubeEmbed.shapeId)
+		if (!shape || shape.type !== 'embed') {
+			youtubeIframeRef.current = null
+			return
+		}
+
+		const { w, h } = getEmbedPageSize(shape)
+		const topLeft = editor.pageToViewport({ x: shape.x, y: shape.y })
+		const bottomRight = editor.pageToViewport({ x: shape.x + w, y: shape.y + h })
+		const centerX = (topLeft.x + bottomRight.x) / 2
+		const centerY = (topLeft.y + bottomRight.y) / 2
+		const iframes = editor.getContainer().querySelectorAll<HTMLIFrameElement>('iframe')
+
+		let best: HTMLIFrameElement | null = null
+		let bestDistance = Number.POSITIVE_INFINITY
+		for (const iframe of Array.from(iframes)) {
+			if (!iframe.src.includes('/embed/')) continue
+			if (!iframe.src.includes(selectedYoutubeEmbed.videoId)) continue
+			const rect = iframe.getBoundingClientRect()
+			const dx = centerX - (rect.left + rect.width / 2)
+			const dy = centerY - (rect.top + rect.height / 2)
+			const distance = Math.hypot(dx, dy)
+			if (distance < bestDistance) {
+				bestDistance = distance
+				best = iframe
+			}
+		}
+
+		youtubeIframeRef.current = best
+	}, [editor, overlayRenderTick, selectedYoutubeEmbed])
+
+	const postYoutubeCommand = React.useCallback((func: string, args: unknown[] = []) => {
+		const iframe = youtubeIframeRef.current
+		if (!iframe?.contentWindow) return
+		iframe.contentWindow.postMessage(
+			JSON.stringify({
+				event: 'command',
+				func,
+				args,
+			}),
+			'*'
+		)
+	}, [])
+
+	React.useEffect(() => {
+		if (!selectedYoutubeEmbed?.videoId) return
+
+		const onMessage = (event: MessageEvent) => {
+			const iframe = youtubeIframeRef.current
+			if (!iframe?.contentWindow || event.source !== iframe.contentWindow) return
+
+			let payload: unknown
+			if (typeof event.data === 'string') {
+				try {
+					payload = JSON.parse(event.data)
+				} catch {
+					return
+				}
+			} else {
+				payload = event.data
+			}
+
+			const data = payload as {
+				event?: string
+				info?: {
+					currentTime?: number
+					duration?: number
+					playerState?: number
+					muted?: boolean
+					playbackRate?: number
+					availablePlaybackRates?: number[]
+					videoData?: { title?: string }
+				}
+			}
+
+			if (data.event !== 'infoDelivery' || !data.info) return
+
+			setYoutubePlayerHud((current) => ({
+				currentTime:
+					typeof data.info?.currentTime === 'number' ? data.info.currentTime : current.currentTime,
+				duration: typeof data.info?.duration === 'number' ? data.info.duration : current.duration,
+				playerState:
+					typeof data.info?.playerState === 'number' ? data.info.playerState : current.playerState,
+				title: data.info?.videoData?.title ?? current.title,
+				muted: typeof data.info?.muted === 'boolean' ? data.info.muted : current.muted,
+				playbackRate:
+					typeof data.info?.playbackRate === 'number'
+						? data.info.playbackRate
+						: current.playbackRate,
+				availablePlaybackRates:
+					Array.isArray(data.info?.availablePlaybackRates) &&
+					data.info.availablePlaybackRates.length > 0
+						? data.info.availablePlaybackRates.filter(
+							(rate): rate is number => typeof rate === 'number' && Number.isFinite(rate) && rate > 0
+						)
+						: current.availablePlaybackRates,
+			}))
+		}
+
+		window.addEventListener('message', onMessage)
+		const intervalId = window.setInterval(() => {
+			const iframe = youtubeIframeRef.current
+			if (!iframe?.contentWindow) return
+			iframe.contentWindow.postMessage(JSON.stringify({ event: 'listening' }), '*')
+			postYoutubeCommand('addEventListener', ['onStateChange'])
+			postYoutubeCommand('getCurrentTime')
+			postYoutubeCommand('getDuration')
+			postYoutubeCommand('isMuted')
+			postYoutubeCommand('getVideoData')
+			postYoutubeCommand('getPlaybackRate')
+			postYoutubeCommand('getAvailablePlaybackRates')
+		}, 350)
+
+		return () => {
+			window.removeEventListener('message', onMessage)
+			window.clearInterval(intervalId)
+		}
+	}, [postYoutubeCommand, selectedYoutubeEmbed?.videoId])
+
+	const onYoutubeTogglePlay = React.useCallback(() => {
+		if (youtubePlayerHud.playerState === 1) {
+			postYoutubeCommand('pauseVideo')
+			return
+		}
+		postYoutubeCommand('playVideo')
+	}, [postYoutubeCommand, youtubePlayerHud.playerState])
+
+	const onYoutubeToggleMute = React.useCallback(() => {
+		if (youtubePlayerHud.muted) {
+			postYoutubeCommand('unMute')
+			return
+		}
+		postYoutubeCommand('mute')
+	}, [postYoutubeCommand, youtubePlayerHud.muted])
+
+	const onYoutubeSeek = React.useCallback(
+		(fraction: number) => {
+			const duration = youtubePlayerHud.duration
+			if (!Number.isFinite(duration) || duration <= 0) return
+			const targetSeconds = clampUnit(fraction) * duration
+			postYoutubeCommand('seekTo', [targetSeconds, true])
+		},
+		[postYoutubeCommand, youtubePlayerHud.duration]
+	)
+
+	const playlistEntriesForSelectedEmbed = React.useMemo(() => {
+		if (!selectedYoutubeEmbed) return [] as YoutubePlaylistEntry[]
+		return playlistEntriesByShapeId[selectedYoutubeEmbed.shapeId] ?? []
+	}, [playlistEntriesByShapeId, selectedYoutubeEmbed])
+
+	const selectedYoutubePlaylistIndex = React.useMemo(() => {
+		if (!selectedYoutubeIds.videoId || playlistEntriesForSelectedEmbed.length === 0) return -1
+		return playlistEntriesForSelectedEmbed.findIndex((entry) => {
+			const ids = parseYoutubeIds(entry.url)
+			return ids.videoId === selectedYoutubeIds.videoId
+		})
+	}, [playlistEntriesForSelectedEmbed, selectedYoutubeIds.videoId])
+
+	const canYoutubeStepPlaylist =
+		playlistEntriesForSelectedEmbed.length > 1 || !!selectedYoutubeEmbed?.playlistId
+	const youtubePlaybackRates =
+		youtubePlayerHud.availablePlaybackRates.length > 0
+			? youtubePlayerHud.availablePlaybackRates
+			: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2]
+
+	const onYoutubePlaylistStep = React.useCallback(
+		(direction: 1 | -1) => {
+			if (playlistEntriesForSelectedEmbed.length > 0 && selectedYoutubePlaylistIndex >= 0) {
+				const count = playlistEntriesForSelectedEmbed.length
+				const nextIndex = (selectedYoutubePlaylistIndex + direction + count) % count
+				const nextEntry = playlistEntriesForSelectedEmbed[nextIndex]
+				if (nextEntry) updateYoutubeEmbedVideo(nextEntry.url)
+				return
+			}
+
+			if (selectedYoutubeEmbed?.playlistId) {
+				postYoutubeCommand(direction > 0 ? 'nextVideo' : 'previousVideo')
+			}
+		},
+		[
+			playlistEntriesForSelectedEmbed,
+			postYoutubeCommand,
+			selectedYoutubeEmbed?.playlistId,
+			selectedYoutubePlaylistIndex,
+			updateYoutubeEmbedVideo,
+		]
+	)
+
+	const onYoutubeSetPlaybackRate = React.useCallback(
+		(nextRate: number) => {
+			if (!Number.isFinite(nextRate) || nextRate <= 0) return
+			postYoutubeCommand('setPlaybackRate', [nextRate])
+			setYoutubePlayerHud((current) => ({ ...current, playbackRate: nextRate }))
+		},
+		[postYoutubeCommand]
+	)
+
+	const toggleSelectedEmbedPinToCamera = React.useCallback(() => {
+		if (!editor || !selectedYoutubeEmbed) return
+		if (embedPinToCamera?.shapeId === selectedYoutubeEmbed.shapeId) {
+			const shape = editor.getShape(selectedYoutubeEmbed.shapeId)
+			if (shape && shape.type === 'embed') {
+				editor.updateShapes([
+					{
+						id: shape.id,
+						type: 'embed',
+						props: {
+							w: embedPinToCamera.originalW,
+							h: embedPinToCamera.originalH,
+						},
+					},
+				])
+			}
+			setEmbedPinToCamera(null)
+			return
+		}
+
+		const shape = editor.getShape(selectedYoutubeEmbed.shapeId)
+		if (!shape || shape.type !== 'embed') return
+		const { w, h } = getEmbedPageSize(shape)
+		const scale = getEditorViewportScale(editor)
+		const viewportPoint = editor.pageToViewport({ x: shape.x, y: shape.y })
+
+		setEmbedPinToCamera({
+			shapeId: selectedYoutubeEmbed.shapeId,
+			viewportX: viewportPoint.x,
+			viewportY: viewportPoint.y,
+			screenW: w * scale,
+			screenH: h * scale,
+			originalW: w,
+			originalH: h,
+		})
+	}, [editor, embedPinToCamera, selectedYoutubeEmbed])
+
 	const loadPlaylistFromInput = React.useCallback(() => {
 		if (!selectedYoutubeEmbed) return
 
@@ -1352,6 +2887,19 @@ const TldrawApp = ({
 	const pencilBaseStrokeEnabled = userSettings.debugLogs?.pencilBaseStroke ?? true
 	const pencilSampledOverlayEnabled = userSettings.debugLogs?.pencilSampledOverlay ?? true
 	const pencilFallbackStylingEnabled = userSettings.debugLogs?.pencilFallbackStyling ?? true
+	const hasSelectedKritaPreset =
+		!!userSettings.handwritingRecognition?.kritaSelectedPresetId || !!runtimeSelectedPresetId
+	const isKritaStampShapeOverride = activeStampShapeModeState === 'circle' || activeStampShapeModeState === 'rectangle'
+	const useKritaRasterPipeline = hasSelectedKritaPreset || isKritaStampShapeOverride
+	const hasSelectedDrawShape = useValue(
+		'has selected draw shape',
+		() => {
+			if (!editor) return false
+			return editor.getSelectedShapes().some((shape) => shape.type === 'draw')
+		},
+		[editor]
+	)
+	const forceVisibleSelectedDrawDiagnostic = hasSelectedDrawShape
 
 	// Force tldraw to invalidate render cache when renderer settings change
 	const invalidateDrawShapeCache = React.useCallback(() => {
@@ -1375,24 +2923,58 @@ const TldrawApp = ({
 	}, [editor])
 
 	React.useEffect(() => {
-		setPencilDefaultStrokeEnabled(pencilDefaultStrokeEnabled)
-		setPencilBaseStrokeEnabled(pencilBaseStrokeEnabled)
-		setPencilSampledOverlayEnabled(pencilSampledOverlayEnabled)
-		setPencilFallbackStylingEnabled(pencilFallbackStylingEnabled)
+		const effectiveDefaultStrokeEnabled = forceVisibleSelectedDrawDiagnostic
+			? true
+			: useKritaRasterPipeline
+				? false
+				: pencilDefaultStrokeEnabled
+		const effectiveBaseStrokeEnabled = forceVisibleSelectedDrawDiagnostic
+			? true
+			: useKritaRasterPipeline
+				? false
+				: pencilBaseStrokeEnabled
+		const effectiveSampledOverlayEnabled = forceVisibleSelectedDrawDiagnostic
+			? false
+			: useKritaRasterPipeline
+				? true
+				: pencilSampledOverlayEnabled
+		const effectiveFallbackStylingEnabled = forceVisibleSelectedDrawDiagnostic
+			? true
+			: useKritaRasterPipeline
+				? false
+				: pencilFallbackStylingEnabled
+
+		setPencilDefaultStrokeEnabled(effectiveDefaultStrokeEnabled)
+		setPencilBaseStrokeEnabled(effectiveBaseStrokeEnabled)
+		setPencilSampledOverlayEnabled(effectiveSampledOverlayEnabled)
+		setPencilFallbackStylingEnabled(effectiveFallbackStylingEnabled)
 		// Apply all renderer toggles first, then invalidate once.
 		console.log('[TldrawApp] Pencil renderer toggles updated', {
+			forceVisibleSelectedDrawDiagnostic,
+			hasSelectedDrawShape,
+			useKritaRasterPipeline,
 			pencilDefaultStrokeEnabled,
 			pencilBaseStrokeEnabled,
 			pencilSampledOverlayEnabled,
 			pencilFallbackStylingEnabled,
+			effectiveDefaultStrokeEnabled,
+			effectiveBaseStrokeEnabled,
+			effectiveSampledOverlayEnabled,
+			effectiveFallbackStylingEnabled,
 		})
-		console.log('[TldrawApp] Pencil fallback styling toggled:', pencilFallbackStylingEnabled)
+		console.log('[TldrawApp] Pencil fallback styling toggled:', effectiveFallbackStylingEnabled)
 		invalidateDrawShapeCache()
 	}, [
+		activeStampShapeModeState,
+		forceVisibleSelectedDrawDiagnostic,
+		hasSelectedKritaPreset,
+		hasSelectedDrawShape,
 		pencilBaseStrokeEnabled,
 		pencilDefaultStrokeEnabled,
 		pencilFallbackStylingEnabled,
+		useKritaRasterPipeline,
 		pencilSampledOverlayEnabled,
+		runtimeSelectedPresetId,
 		invalidateDrawShapeCache,
 	])
 
@@ -1912,8 +3494,11 @@ const TldrawApp = ({
 			updateDrawingShape?: () => void
 			onPointerUp?: () => void
 			onExit?: () => void
+			parent?: {
+				transition: (state: string) => void
+			}
 			initialShape?: {
-				id: string
+				id: TLShapeId
 				type: 'draw'
 				props?: {
 					scale?: number
@@ -1921,7 +3506,7 @@ const TldrawApp = ({
 			}
 		}
 
-		const drawingState = editor.getStateDescendant<PencilDrawingStateLike>('pencil.drawing')
+		const drawingState = editor.getStateDescendant('pencil.drawing') as PencilDrawingStateLike | undefined
 		if (!drawingState || typeof drawingState.updateDrawingShape !== 'function') return
 
 		const textureEnabled = userSettings.handwritingRecognition?.pencilTextureEnabled ?? true
@@ -2200,11 +3785,13 @@ const TldrawApp = ({
 				originalUpdateDrawingShape()
 				const activeShapeId = drawingState.initialShape?.id
 				if (activeShapeId && !scrubState.active) {
+					const safeOriginalX = typeof originalX === 'number' ? originalX : baseX
+					const safeOriginalY = typeof originalY === 'number' ? originalY : baseY
 					pressureStore.appendPendingSessionPoint(activeShapeId, {
 						x: baseX,
 						y: baseY,
 						pressure: rawPressure,
-						velocityMagnitude: Math.hypot(baseX - originalX, baseY - originalY),
+						velocityMagnitude: Math.hypot(baseX - safeOriginalX, baseY - safeOriginalY),
 					})
 				}
 			} finally {
@@ -2236,7 +3823,7 @@ const TldrawApp = ({
 				scrubState.cancelCurrentStrokeOnExit = false
 				maybeFinishScrub()
 				setPencilScrubHud((prev) => ({ ...prev, active: false }))
-				drawingState.parent.transition('idle')
+				drawingState.parent?.transition('idle')
 				return
 			}
 
@@ -2278,7 +3865,6 @@ const TldrawApp = ({
 			drawingState.updateDrawingShape = originalUpdateDrawingShape
 			drawingState.onPointerUp = originalOnPointerUp
 			drawingState.onExit = originalOnExit
-				shapeUtils={shapeUtils}
 		}
 	}, [
 		editor,
@@ -2726,17 +4312,18 @@ const TldrawApp = ({
 				})
 			}
 
-			if (userSettings.debugMode) {
+			if (editor && userSettings.debugMode) {
 				const shape = editor.getShape(result.shapeId)
 				if (shape?.type === 'draw') {
-					const segmentPoints = shape.props.segments.flatMap((segment) => segment.points)
+					const drawProps = shape.props as TLDrawShape['props']
+					const segmentPoints = drawProps.segments.flatMap((segment) => segment.points)
 					const zValues = segmentPoints
-						.map((point) => (typeof point.z === 'number' ? point.z : null))
+						.map((point: { z?: number }) => (typeof point.z === 'number' ? point.z : null))
 						.filter((value): value is number => value !== null)
 					const minZ = zValues.length ? Math.min(...zValues) : 0
 					const maxZ = zValues.length ? Math.max(...zValues) : 0
 					const meanZ = zValues.length
-						? zValues.reduce((sum, value) => sum + value, 0) / zValues.length
+						? zValues.reduce((sum: number, value: number) => sum + value, 0) / zValues.length
 						: 0
 					const zBuckets = [0, 0, 0, 0, 0]
 					for (const value of zValues) {
@@ -2751,7 +4338,7 @@ const TldrawApp = ({
 						documentId: handwritingDocumentId,
 						shapeId: result.shapeId,
 						topLevelOpacity: shape.opacity,
-						segmentCount: shape.props.segments.length,
+						segmentCount: drawProps.segments.length,
 						pointCount: segmentPoints.length,
 						zMin: Number(minZ.toFixed(3)),
 						zMax: Number(maxZ.toFixed(3)),
@@ -2818,7 +4405,7 @@ const TldrawApp = ({
 	)
 
 	const onShapesRemoved = React.useCallback(
-		(shapeIds: string[]) => {
+		(shapeIds: TLShapeId[]) => {
 			if (!Array.isArray(shapeIds) || shapeIds.length === 0) return
 
 			for (const shapeId of shapeIds) {
@@ -2844,6 +4431,11 @@ const TldrawApp = ({
 				scheduleRecognition(recognitionCandidates)
 			}
 
+			if (payloads.length === 0) {
+				clearCommittedCanvas()
+				void removeCurrentSidecarFiles()
+			}
+
 			if (userSettings.debugMode) {
 				console.log('[handwriting] shapes removed cleanup complete', {
 					documentId: handwritingDocumentId,
@@ -2855,7 +4447,9 @@ const TldrawApp = ({
 		},
 		[
 			buildRecognitionCandidates,
+			clearCommittedCanvas,
 			handwritingDocumentId,
+			removeCurrentSidecarFiles,
 			scheduleRecognition,
 			userSettings.debugMode,
 		]
@@ -2959,7 +4553,7 @@ const TldrawApp = ({
 	)
 
 	const onAnyShapesRemoved = React.useCallback(
-		(shapeIds: string[]) => {
+		(shapeIds: TLShapeId[]) => {
 			if (!Array.isArray(shapeIds) || shapeIds.length === 0) return
 			const canvasPath = plugin.app.workspace.getActiveFile()?.path
 			let removedCount = 0
@@ -2989,7 +4583,7 @@ const TldrawApp = ({
 
 		const selectedShapeIds = Array.from(editor.getSelectedShapeIds())
 		let shapeId = selectedShapeIds[0]
-		let createdShapeId: string | undefined
+		let createdShapeId: TLShapeId | undefined
 
 		if (!shapeId) {
 			const placementPoint = resolveAnchorPlacementPoint(editor)
@@ -3062,7 +4656,7 @@ const TldrawApp = ({
 	])
 
 	const onShapesMoved = React.useCallback(
-		(shapeIds: string[]) => {
+		(shapeIds: TLShapeId[]) => {
 			if (!Array.isArray(shapeIds) || shapeIds.length === 0) return
 			if (!editor) return
 
@@ -3131,6 +4725,10 @@ const TldrawApp = ({
 		acquireDocumentAnchorStickerScope(handwritingDocumentId)
 
 		return () => {
+			if (saveTimeoutRef.current) {
+				clearTimeout(saveTimeoutRef.current)
+				saveTimeoutRef.current = undefined
+			}
 			if (recognitionDebounceTimerRef.current) {
 				clearTimeout(recognitionDebounceTimerRef.current)
 				recognitionDebounceTimerRef.current = undefined
@@ -3158,21 +4756,26 @@ const TldrawApp = ({
 		plugin.onTriggerAnchorStickerAssign = () => {
 			void triggerAnchorStickerAssign()
 		}
+		plugin.onTriggerCaptureSelectionStamp = () => {
+			captureSelectedShapeAsStamp()
+		}
 		return () => {
 			plugin.onTriggerHandwritingSearch = undefined
 			plugin.onTriggerAnchorStickerAssign = undefined
+			plugin.onTriggerCaptureSelectionStamp = undefined
 		}
-	}, [plugin, triggerAnchorStickerAssign])
+	}, [captureSelectedShapeAsStamp, plugin, triggerAnchorStickerAssign])
 
 	const anchorStickerOverlays = React.useMemo<AnchorStickerOverlay[]>(() => {
 		if (!editor) return []
 		return getDocumentAnchorStickers(handwritingDocumentId)
 			.map((sticker) => {
-				const shape = editor.getShape(sticker.shapeId)
+					const shapeId = sticker.shapeId as TLShapeId
+					const shape = editor.getShape(shapeId)
 				if (!shape) return null
 				const viewportPoint = editor.pageToViewport({ x: shape.x, y: shape.y })
 				return {
-					shapeId: sticker.shapeId,
+						shapeId,
 					targetPath: sticker.targetPath,
 					targetDisplay: sticker.targetDisplay,
 					targetWikilink: sticker.targetWikilink,
@@ -3182,6 +4785,22 @@ const TldrawApp = ({
 			})
 			.filter((overlay): overlay is AnchorStickerOverlay => overlay !== null)
 	}, [editor, handwritingDocumentId, overlayRenderTick])
+
+	const captureStampButtonOverlay = useValue(
+		'capture-stamp-button-overlay',
+		() => {
+			if (!editor) return null
+			const selectionBounds = editor.getSelectionRotatedPageBounds()
+			if (!selectionBounds) return null
+
+			const center = editor.pageToViewport(selectionBounds.center)
+			return {
+				left: center.x,
+				top: center.y - selectionBounds.height / 2 - 48,
+			}
+		},
+		[editor]
+	)
 
 	const openAnchorTarget = React.useCallback(
 		(targetPath: string) => {
@@ -3196,7 +4815,7 @@ const TldrawApp = ({
 	)
 
 	const deleteAnchorSticker = React.useCallback(
-		(shapeId: string) => {
+		(shapeId: TLShapeId) => {
 			if (!editor) return
 			editor.deleteShape(shapeId)
 			setOverlayRenderTick((tick) => tick + 1)
@@ -3205,11 +4824,11 @@ const TldrawApp = ({
 	)
 
 	const onAnchorStickerContextMenu = React.useCallback(
-		(event: React.MouseEvent<HTMLButtonElement>, shapeId: string) => {
+		(event: React.MouseEvent<HTMLButtonElement>, shapeId: TLShapeId) => {
 			event.preventDefault()
 			event.stopPropagation()
 
-			const menu = new Menu(plugin.app)
+			const menu = new Menu()
 			menu.addItem((item) => {
 				item
 					.setTitle('Delete anchor sticker')
@@ -3333,9 +4952,9 @@ const TldrawApp = ({
 			}
 		}
 
-		keydownTarget.addEventListener('keydown', onKeyDown, true)
+		keydownTarget.addEventListener('keydown', onKeyDown as EventListener, true)
 		return () => {
-			keydownTarget.removeEventListener('keydown', onKeyDown, true)
+			keydownTarget.removeEventListener('keydown', onKeyDown as EventListener, true)
 			if (userSettings.debugMode) {
 				console.log('[handwriting-search] Ctrl+F listener removed', {
 					documentId: handwritingDocumentId,
@@ -3436,22 +5055,49 @@ const TldrawApp = ({
 	}, [plugin])
 
 	return (
-		<div
-			className={`tldraw-view-root${userSettings.darkModeInvert ? ' ptl-dark-mode-invert' : ''}${
-				pencilScrubHud.active ? ' ptl-pencil-scrubbing' : ''
-			}`}
-			style={pencilScrubHud.active ? { cursor: 'col-resize' } : undefined}
-			// e.stopPropagation(); this line should solve the mobile swipe menus bug
-			// The bug only happens on the mobile version of Obsidian.
-			// When a user tries to interact with the tldraw canvas,
-			// Obsidian thinks they're swiping down, left, or right so it opens various menus.
-			// By preventing the event from propagating, we can prevent those actions menus from opening.
-			onTouchStart={(e) => e.stopPropagation()}
-			ref={editorContainerRef}
-			onFocus={(e) => {
-				setFocusedEditor(false, editor)
-			}}
-		>
+		<KritaBrushRuntimeContext.Provider value={kritaBrushRuntimeContext}>
+			<div
+				className={`tldraw-view-root${userSettings.darkModeInvert ? ' ptl-dark-mode-invert' : ''}${
+					pencilScrubHud.active ? ' ptl-pencil-scrubbing' : ''
+				}`}
+				style={
+					pencilScrubHud.active
+						? { position: 'relative', cursor: 'col-resize' }
+						: { position: 'relative' }
+				}
+				// e.stopPropagation(); this line should solve the mobile swipe menus bug
+				// The bug only happens on the mobile version of Obsidian.
+				// When a user tries to interact with the tldraw canvas,
+				// Obsidian thinks they're swiping down, left, or right so it opens various menus.
+				// By preventing the event from propagating, we can prevent those actions menus from opening.
+				onTouchStart={(e) => e.stopPropagation()}
+				onPointerDownCapture={onCanvasPointerDownCapture}
+				onPointerMoveCapture={onCanvasPointerMoveCapture}
+				onPointerUpCapture={onCanvasPointerUpCapture}
+				onPointerCancelCapture={onCanvasPointerCancelCapture}
+				ref={editorContainerRef}
+				onFocus={() => {
+					setFocusedEditor(false, editor)
+				}}
+			>
+				<canvas
+					ref={committedCanvasRef}
+					style={{
+						position: 'absolute',
+						inset: 0,
+						pointerEvents: 'none',
+						zIndex: 10,
+					}}
+				/>
+				<canvas
+					ref={activeCanvasRef}
+					style={{
+						position: 'absolute',
+						inset: 0,
+						pointerEvents: 'none',
+						zIndex: 11,
+					}}
+				/>
 			{anchorStickerOverlays.map((overlay) => (
 				<button
 					type="button"
@@ -3467,6 +5113,30 @@ const TldrawApp = ({
 					{overlay.targetDisplay}
 				</button>
 			))}
+			{captureStampButtonOverlay ? (
+				<button
+					type="button"
+					className="ptl-capture-stamp-button"
+					style={{
+						transform: `translate(${captureStampButtonOverlay.left}px, ${captureStampButtonOverlay.top}px)`,
+						position: 'absolute',
+						padding: '8px 12px',
+						backgroundColor: '#007acc',
+						color: 'white',
+						border: 'none',
+						borderRadius: '4px',
+						cursor: 'pointer',
+						fontSize: '12px',
+						fontWeight: 500,
+						zIndex: 12,
+						whiteSpace: 'nowrap',
+					}}
+					onClick={() => captureSelectedShapeAsStamp()}
+					title="Use selection as brush stamp"
+				>
+					📌 Use as Stamp
+				</button>
+			) : null}
 			{activeSearchHighlightBox ? (
 				<div
 					className="ptl-handwriting-search-hit-box"
@@ -3560,15 +5230,154 @@ const TldrawApp = ({
 					Predict now
 				</button>
 			) : null}
+			<button
+				type="button"
+				className="ptl-krita-test-rect-button"
+				style={{
+					top: userSettings.handwritingRecognition?.manualPredictButton ? '84px' : '12px',
+				}}
+				onClick={createCenterRawRectangleStroke}
+				title="Create an erasable raw rectangle stroke at camera center"
+			>
+				Create Raw Rect Stroke
+			</button>
+			<button
+				type="button"
+				className="ptl-krita-test-rect-button"
+				style={{
+					top: userSettings.handwritingRecognition?.manualPredictButton ? '120px' : '48px',
+				}}
+				onClick={createCenterInkyRectangleStroke}
+				title="Create an erasable inky rectangle stroke at camera center"
+			>
+				Create Inky Rect Stroke
+			</button>
 			{selectedYoutubeEmbed ? (
 				<button
 					type="button"
 					className="ptl-handwriting-predict-button"
-					style={{ top: userSettings.handwritingRecognition?.manualPredictButton ? '48px' : '12px' }}
+					style={{ top: userSettings.handwritingRecognition?.manualPredictButton ? '156px' : '84px' }}
 					onClick={() => setIsPlaylistPanelOpen((current) => !current)}
 				>
 					Playlist
 				</button>
+			) : null}
+			{selectedEmbedPinButtonPosition ? (
+				<button
+					type="button"
+					className={`ptl-embed-pin-button${selectedEmbedPinButtonPosition.isPinned ? ' is-pinned' : ''}`}
+					style={{
+						left: `${selectedEmbedPinButtonPosition.left}px`,
+						top: `${selectedEmbedPinButtonPosition.top}px`,
+					}}
+					onClick={toggleSelectedEmbedPinToCamera}
+					title={
+						selectedEmbedPinButtonPosition.isPinned
+							? 'Unpin from camera'
+							: 'Pin to camera'
+					}
+				>
+					{selectedEmbedPinButtonPosition.isPinned ? 'Unpin' : 'Pin'}
+				</button>
+			) : null}
+			{youtubeControlsOverlayPosition && selectedYoutubeEmbed?.videoId ? (
+				<div
+					className="ptl-youtube-custom-controls"
+					style={{
+						left: `${youtubeControlsOverlayPosition.left}px`,
+						top: `${youtubeControlsOverlayPosition.top}px`,
+						width: `${youtubeControlsOverlayPosition.width}px`,
+						transform: `scale(${youtubeControlsOverlayPosition.scale})`,
+						transformOrigin: 'left top',
+					}}
+				>
+					<button
+						type="button"
+						className="ptl-youtube-custom-controls-btn"
+						onClick={() => onYoutubePlaylistStep(-1)}
+						disabled={!canYoutubeStepPlaylist}
+						title="Previous video"
+					>
+						{'<<'}
+					</button>
+					<button
+						type="button"
+						className="ptl-youtube-custom-controls-btn"
+						onClick={onYoutubeTogglePlay}
+						title={youtubePlayerHud.playerState === 1 ? 'Pause' : 'Play'}
+					>
+						{youtubePlayerHud.playerState === 1 ? 'II' : '>'}
+					</button>
+					<div
+						className="ptl-youtube-custom-controls-track-wrap"
+						onMouseLeave={() => setYoutubeScrubPreview(null)}
+					>
+						<input
+							type="range"
+							className="ptl-youtube-custom-controls-track"
+							min={0}
+							max={1000}
+							value={Math.round(youtubePlaybackFraction * 1000)}
+							onChange={(event) => {
+								const nextFraction = Number(event.currentTarget.value) / 1000
+								onYoutubeSeek(nextFraction)
+							}}
+							onMouseMove={(event) => {
+								const rect = event.currentTarget.getBoundingClientRect()
+								const fraction = clampUnit((event.clientX - rect.left) / rect.width)
+								setYoutubeScrubPreview({
+									active: true,
+									fraction,
+									left: fraction * rect.width,
+								})
+							}}
+						/>
+						{youtubeScrubPreview?.active ? (
+							<div
+								className="ptl-youtube-custom-controls-preview"
+								style={{ left: `${youtubeScrubPreview.left}px` }}
+							>
+								{youtubePreviewThumbnailUrl ? (
+									<img src={youtubePreviewThumbnailUrl} alt="Preview" />
+								) : null}
+								<div>{formatYoutubeTime(youtubePreviewTime)}</div>
+							</div>
+						) : null}
+					</div>
+					<div className="ptl-youtube-custom-controls-time">
+						{formatYoutubeTime(youtubePlayerHud.currentTime)} / {formatYoutubeTime(youtubePlayerHud.duration)}
+					</div>
+					<button
+						type="button"
+						className="ptl-youtube-custom-controls-btn"
+						onClick={onYoutubeToggleMute}
+						title={youtubePlayerHud.muted ? 'Unmute' : 'Mute'}
+					>
+						{youtubePlayerHud.muted ? 'M' : 'V'}
+					</button>
+					<button
+						type="button"
+						className="ptl-youtube-custom-controls-btn"
+						onClick={() => onYoutubePlaylistStep(1)}
+						disabled={!canYoutubeStepPlaylist}
+						title="Next video"
+					>
+						{'>>'}
+					</button>
+					<label className="ptl-youtube-custom-controls-speed" title="Playback speed">
+						<span>Speed</span>
+						<select
+							value={youtubePlayerHud.playbackRate}
+							onChange={(event) => onYoutubeSetPlaybackRate(Number(event.currentTarget.value))}
+						>
+							{youtubePlaybackRates.map((rate) => (
+								<option key={rate} value={rate}>
+									{rate}x
+								</option>
+							))}
+						</select>
+					</label>
+				</div>
 			) : null}
 			{userSettings.debugMode ? (
 				<button
@@ -3705,8 +5514,18 @@ const TldrawApp = ({
 							Load Manual List
 						</button>
 					</div>
+					<input
+						className="ptl-youtube-playlist-search-input"
+						type="text"
+						placeholder="Search videos..."
+						value={playlistSearchQuery}
+						onChange={(event) => setPlaylistSearchQuery(event.currentTarget.value)}
+					/>
 					<div className="ptl-youtube-playlist-videos">
-						{(playlistEntriesByShapeId[selectedYoutubeEmbed.shapeId] ?? []).map((entry, index) => {
+						{filteredPlaylistEntries.length === 0 ? (
+							<div className="ptl-youtube-playlist-status">No matching videos</div>
+						) : null}
+						{filteredPlaylistEntries.map((entry, index) => {
 							const ids = parseYoutubeIds(entry.url)
 							const label = entry.title?.trim() || ids.videoId || 'Video'
 							const isActive = !!ids.videoId && ids.videoId === selectedYoutubeIds.videoId
@@ -3795,7 +5614,8 @@ const TldrawApp = ({
 				tools={tools}
 				className={fbWorkAroundClassname}
 			/>
-		</div>
+			</div>
+		</KritaBrushRuntimeContext.Provider>
 	)
 }
 

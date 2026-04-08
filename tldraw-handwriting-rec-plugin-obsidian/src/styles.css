@@ -56,6 +56,176 @@
 	filter: brightness(0.95);
 }
 
+.tldraw-view-root .ptl-embed-pin-button {
+	position: absolute;
+	z-index: 25;
+	border: 1px solid rgb(255 255 255 / 34%);
+	background: rgb(255 255 255 / 22%);
+	backdrop-filter: blur(8px) saturate(130%);
+	-webkit-backdrop-filter: blur(8px) saturate(130%);
+	color: color-mix(in srgb, var(--text-normal) 88%, black);
+	border-radius: 999px;
+	padding: 4px 9px;
+	font-size: 11px;
+	font-weight: 700;
+	cursor: pointer;
+	box-shadow: 0 6px 16px rgb(0 0 0 / 24%);
+}
+
+.tldraw-view-root .ptl-krita-test-rect-button {
+	position: absolute;
+	right: 12px;
+	z-index: 24;
+	padding: 7px 10px;
+	border: 1px solid color-mix(in srgb, var(--interactive-accent) 55%, var(--background-modifier-border));
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--interactive-accent) 16%, var(--background-primary));
+	color: var(--text-normal);
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+	box-shadow: 0 4px 10px rgb(0 0 0 / 18%);
+}
+
+.tldraw-view-root .ptl-krita-test-rect-button:hover {
+	background: color-mix(in srgb, var(--interactive-accent) 24%, var(--background-primary));
+}
+
+.tldraw-view-root .ptl-embed-pin-button:hover {
+	background: rgb(255 255 255 / 32%);
+}
+
+.tldraw-view-root .ptl-embed-pin-button.is-pinned {
+	border-color: color-mix(in srgb, var(--interactive-accent) 68%, rgb(255 255 255 / 30%));
+	background: color-mix(in srgb, var(--interactive-accent) 26%, rgb(255 255 255 / 20%));
+}
+
+.tldraw-view-root .ptl-youtube-custom-controls {
+	position: absolute;
+	z-index: 26;
+	display: grid;
+	grid-template-columns: auto auto 1fr auto auto auto auto;
+	align-items: center;
+	gap: 8px;
+	padding: 7px 10px;
+	border: 2px solid rgb(40 34 29 / 65%);
+	border-radius: 14px;
+	background:
+		repeating-linear-gradient(
+			-8deg,
+			rgb(250 243 228 / 94%) 0,
+			rgb(250 243 228 / 94%) 6px,
+			rgb(241 230 206 / 94%) 6px,
+			rgb(241 230 206 / 94%) 12px
+		),
+		rgb(246 237 217 / 95%);
+	box-shadow: 0 6px 14px rgb(0 0 0 / 24%), 0 1px 0 rgb(255 255 255 / 55%) inset;
+	font-family: 'Caveat', 'Comic Sans MS', cursive;
+	color: rgb(35 30 26);
+	user-select: none;
+}
+
+.tldraw-view-root .ptl-youtube-custom-controls-btn {
+	min-width: 26px;
+	height: 26px;
+	border: 1.5px solid rgb(42 36 31 / 75%);
+	border-radius: 8px;
+	background: rgb(255 251 240 / 92%);
+	color: rgb(33 28 24);
+	font-family: inherit;
+	font-size: 14px;
+	font-weight: 700;
+	line-height: 1;
+	padding: 0 7px;
+	cursor: pointer;
+	box-shadow: 0 1px 0 rgb(255 255 255 / 55%) inset;
+}
+
+.tldraw-view-root .ptl-youtube-custom-controls-btn:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
+.tldraw-view-root .ptl-youtube-custom-controls-btn:hover {
+	background: rgb(255 246 223 / 98%);
+}
+
+.tldraw-view-root .ptl-youtube-custom-controls-track-wrap {
+	position: relative;
+	min-width: 100px;
+	height: 26px;
+	display: flex;
+	align-items: center;
+}
+
+.tldraw-view-root .ptl-youtube-custom-controls-track {
+	width: 100%;
+	margin: 0;
+	accent-color: rgb(46 39 33);
+	cursor: pointer;
+}
+
+.tldraw-view-root .ptl-youtube-custom-controls-preview {
+	position: absolute;
+	bottom: calc(100% + 8px);
+	transform: translateX(-50%);
+	pointer-events: none;
+	display: grid;
+	gap: 3px;
+	padding: 4px;
+	min-width: 104px;
+	border: 1.5px solid rgb(45 39 34 / 70%);
+	border-radius: 8px;
+	background: rgb(250 245 231 / 96%);
+	box-shadow: 0 4px 10px rgb(0 0 0 / 22%);
+	font-family: inherit;
+	font-size: 12px;
+	font-weight: 700;
+	text-align: center;
+	color: rgb(34 29 25);
+	white-space: nowrap;
+}
+
+.tldraw-view-root .ptl-youtube-custom-controls-preview img {
+	display: block;
+	width: 96px;
+	height: 54px;
+	object-fit: cover;
+	border-radius: 4px;
+	border: 1px solid rgb(32 27 22 / 35%);
+	background: rgb(233 221 194);
+}
+
+.tldraw-view-root .ptl-youtube-custom-controls-time {
+	font-size: 16px;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	white-space: nowrap;
+	min-width: 86px;
+	text-align: right;
+}
+
+.tldraw-view-root .ptl-youtube-custom-controls-speed {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	font-size: 13px;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.tldraw-view-root .ptl-youtube-custom-controls-speed select {
+	height: 26px;
+	border: 1.5px solid rgb(42 36 31 / 75%);
+	border-radius: 8px;
+	background: rgb(255 251 240 / 92%);
+	color: rgb(33 28 24);
+	font-family: inherit;
+	font-weight: 700;
+	padding: 0 6px;
+	cursor: pointer;
+}
+
 .tldraw-view-root .ptl-anchor-sticker-overlay {
 	position: absolute;
 	z-index: 23;
@@ -286,6 +456,18 @@
 	color: var(--text-normal);
 }
 
+.tldraw-view-root .ptl-youtube-playlist-search-input {
+	width: 100%;
+	height: 34px;
+	font-size: 12px;
+	line-height: 1.2;
+	padding: 7px 9px;
+	border-radius: 8px;
+	border: 1px solid rgb(255 255 255 / 22%);
+	background: rgb(255 255 255 / 14%);
+	color: var(--text-normal);
+}
+
 .tldraw-view-root .ptl-youtube-playlist-status {
 	font-size: 12px;
 	color: color-mix(in srgb, var(--text-normal) 72%, black);
@@ -477,6 +659,9 @@
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
+	min-height: 0;
+	max-height: min(48vh, 420px);
+	overflow: hidden;
 }
 
 .tldraw-view-root .ptl-krita-brush-panel-header {
@@ -486,9 +671,38 @@
 	letter-spacing: 0.01em;
 }
 
+.tldraw-view-root .ptl-krita-stamp-mode {
+	display: flex;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+.tldraw-view-root .ptl-krita-stamp-mode-button {
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	color: var(--text-normal);
+	border-radius: 6px;
+	padding: 4px 8px;
+	font-size: 11px;
+	line-height: 1.2;
+	font-weight: 600;
+	cursor: pointer;
+	box-shadow: none;
+}
+
+.tldraw-view-root .ptl-krita-stamp-mode-button[data-selected='true'] {
+	border-color: color-mix(in srgb, var(--interactive-accent) 62%, var(--background-modifier-border));
+	background: color-mix(in srgb, var(--interactive-accent) 14%, var(--background-primary));
+}
+
 .tldraw-view-root .ptl-krita-brush-list {
-	max-height: 180px;
-	overflow: auto;
+	flex: 1 1 auto;
+	min-height: 0;
+	max-height: none;
+	overflow-y: auto;
+	overflow-x: hidden;
+	overflow-anchor: none;
+	overscroll-behavior: contain;
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
