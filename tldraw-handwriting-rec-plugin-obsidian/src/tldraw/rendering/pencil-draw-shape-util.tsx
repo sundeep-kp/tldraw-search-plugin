@@ -4,6 +4,7 @@ import {
 	SvgExportContext,
 	TLAnyShapeUtilConstructor,
 	TLDrawShape,
+	type TLShapeId,
 	defaultShapeUtils,
 } from 'tldraw'
 import { getPressureOpacityStyle } from 'src/tldraw/rendering/pencil-texture'
@@ -21,10 +22,133 @@ export const activeStampShapeModeRef: React.MutableRefObject<StampShapeMode> = {
 }
 
 /**
+ * Module-level reference indicating the camera is moving.
+ * When true, custom pencil rendering should take the cheapest possible path.
+ */
+export const cameraMovingRef: React.MutableRefObject<boolean> = { current: false }
+
+/**
  * Module-level reference to the editor's current zoom level.
  * Set by TldrawApp to enable zoom-aware sampling degradation.
  */
 export const editorZoomRef: React.MutableRefObject<number> = { current: 1 }
+export const editorRef: React.MutableRefObject<import('tldraw').Editor | null> = { current: null }
+
+/**
+ * Module-level references for renderer configuration flags.
+ */
+export const pencilDefaultStrokeEnabledRef: React.MutableRefObject<boolean> = { current: true }
+export const pencilBaseStrokeEnabledRef: React.MutableRefObject<boolean> = { current: true }
+export const pencilSampledOverlayEnabledRef: React.MutableRefObject<boolean> = { current: true }
+export const pencilFallbackStylingEnabledRef: React.MutableRefObject<boolean> = { current: true }
+export const pencilCrossSectionAspectRatioRef: React.MutableRefObject<number> = { current: 0.5 }
+export const pencilOpacitySensitivityRef: React.MutableRefObject<number> = { current: 1 }
+let rendererFlagsVersion = 0
+
+export function getPencilDefaultStrokeEnabled(): boolean {
+	return pencilDefaultStrokeEnabledRef.current
+}
+
+export function setPencilDefaultStrokeEnabled(value: boolean): void {
+	pencilDefaultStrokeEnabledRef.current = value
+	rendererFlagsVersion = (rendererFlagsVersion + 1) >>> 0
+}
+
+export function getPencilBaseStrokeEnabled(): boolean {
+	return pencilBaseStrokeEnabledRef.current
+}
+
+export function setPencilBaseStrokeEnabled(value: boolean): void {
+	pencilBaseStrokeEnabledRef.current = value
+	rendererFlagsVersion = (rendererFlagsVersion + 1) >>> 0
+}
+
+export function getPencilSampledOverlayEnabled(): boolean {
+	return pencilSampledOverlayEnabledRef.current
+}
+
+export function setPencilSampledOverlayEnabled(value: boolean): void {
+	pencilSampledOverlayEnabledRef.current = value
+	rendererFlagsVersion = (rendererFlagsVersion + 1) >>> 0
+}
+
+export function getPencilFallbackStylingEnabled(): boolean {
+	return pencilFallbackStylingEnabledRef.current
+}
+
+export function setPencilFallbackStylingEnabled(value: boolean): void {
+	pencilFallbackStylingEnabledRef.current = value
+	rendererFlagsVersion = (rendererFlagsVersion + 1) >>> 0
+}
+
+export function getRendererFlagsVersion(): number {
+	return rendererFlagsVersion
+}
+
+let rendererOwnerEditor: import('tldraw').Editor | null = null
+
+export function claimPencilRendererOwner(editor: import('tldraw').Editor): void {
+	rendererOwnerEditor = editor
+	editorRef.current = editor
+}
+
+export function isPencilRendererOwner(editor: import('tldraw').Editor | null | undefined): boolean {
+	return !!editor && rendererOwnerEditor === editor
+}
+
+export function releasePencilRendererOwner(editor: import('tldraw').Editor): void {
+	if (rendererOwnerEditor !== editor) return
+	rendererOwnerEditor = null
+	editorRef.current = null
+	cameraMovingRef.current = false
+	editorZoomRef.current = 1
+	activeBrushTipRef.current = null
+	activeStampShapeModeRef.current = 'auto'
+}
+
+type RibbonCacheEntry = {
+	key: string
+	node: React.ReactElement
+}
+
+const ribbonCache = new Map<string, RibbonCacheEntry>()
+let ribbonRenderEpoch = 0
+
+export function invalidatePencilRibbonCache(): void {
+	ribbonRenderEpoch = (ribbonRenderEpoch + 1) >>> 0
+	ribbonCache.clear()
+}
+
+function evictRibbonCache(): void {
+	if (ribbonCache.size <= 400) return
+
+	const editor = editorRef.current
+	if (editor) {
+		for (const id of Array.from(ribbonCache.keys())) {
+			if (!editor.getShape(id as TLShapeId)) {
+				ribbonCache.delete(id)
+			}
+		}
+	}
+
+	if (ribbonCache.size > 400) {
+		let removed = 0
+		for (const key of ribbonCache.keys()) {
+			ribbonCache.delete(key)
+			if (++removed >= 80) break
+		}
+	}
+}
+
+function rememberRibbonNode(
+	shapeId: string,
+	cacheKey: string,
+	node: React.ReactElement
+): React.ReactElement {
+	ribbonCache.set(shapeId, { key: cacheKey, node })
+	evictRibbonCache()
+	return node
+}
 
 /**
  * Cache for ImageBitmap -> data URL conversions to avoid repeated rendering.
@@ -51,14 +175,11 @@ function imageBitmapToDataUrl(bitmap: ImageBitmap): string {
 	return dataUrl
 }
 
+
 const DEFAULT_PENCIL_OPACITY_SENSITIVITY = 1
 const DEFAULT_PENCIL_CROSS_SECTION_ASPECT_RATIO = 5
 let pencilOpacitySensitivity = DEFAULT_PENCIL_OPACITY_SENSITIVITY
 let pencilCrossSectionAspectRatio = DEFAULT_PENCIL_CROSS_SECTION_ASPECT_RATIO
-let pencilDefaultStrokeEnabled = true
-let pencilBaseStrokeEnabled = true
-let pencilSampledOverlayEnabled = true
-let pencilFallbackStylingEnabled = true
 
 export function setPencilOpacitySensitivity(value: number) {
 	if (!Number.isFinite(value)) {
@@ -74,22 +195,6 @@ export function setPencilCrossSectionAspectRatio(value: number) {
 		return
 	}
 	pencilCrossSectionAspectRatio = Math.max(1, Math.min(12, value))
-}
-
-export function setPencilBaseStrokeEnabled(value: boolean) {
-	pencilBaseStrokeEnabled = value
-}
-
-export function setPencilSampledOverlayEnabled(value: boolean) {
-	pencilSampledOverlayEnabled = value
-}
-
-export function setPencilFallbackStylingEnabled(value: boolean) {
-	pencilFallbackStylingEnabled = value
-}
-
-export function setPencilDefaultStrokeEnabled(value: boolean) {
-	pencilDefaultStrokeEnabled = value
 }
 
 const STROKE_SIZE_BY_STYLE: Record<string, number> = {
@@ -209,6 +314,12 @@ function getAveragePressureOpacity(shape: TLDrawShape): number {
 	return getPressureOpacityForPoint(averagePressure)
 }
 
+function getRibbonBaseOpacity(shape: TLDrawShape): number {
+	const avg = getAveragePressureOpacity(shape)
+	// Keep a subtle underlay only; this avoids visible halo around textured dabs.
+	return Math.max(0.045, Math.min(0.12, avg * 0.42))
+}
+
 function cloneElementWithOpacity(node: React.ReactNode, opacity: number): React.ReactNode {
 	if (!React.isValidElement(node)) return node
 	return React.cloneElement(node, {
@@ -236,7 +347,12 @@ function getPencilShapeStyle(shape: TLDrawShape): React.CSSProperties | undefine
 	}
 }
 
-function wrapForHtmlRender(node: React.ReactNode): React.ReactNode {
+function ensureElement(node: React.ReactNode): React.ReactElement {
+	if (React.isValidElement(node)) return node
+	return <>{node}</>
+}
+
+function wrapForHtmlRender(node: React.ReactElement | null): React.ReactElement | null {
 	if (!node) return node
 	return (
 		<svg pointerEvents="none" style={{ overflow: 'visible' }}>
@@ -245,7 +361,10 @@ function wrapForHtmlRender(node: React.ReactNode): React.ReactNode {
 	)
 }
 
-function buildPressureSampledRibbonStroke(shape: TLDrawShape, baseElement: React.ReactNode) {
+function buildPressureSampledRibbonStroke(
+	shape: TLDrawShape,
+	baseElement: React.ReactNode
+): React.ReactElement | null {
 	const localPressurePoints = getLocalPressurePointsFromShape(shape)
 	if (localPressurePoints.length < 2) return null
 
@@ -263,33 +382,90 @@ function buildPressureSampledRibbonStroke(shape: TLDrawShape, baseElement: React
 			? basePath.props.strokeWidth
 			: ((STROKE_SIZE_BY_STYLE[shape.props.size] ?? STROKE_SIZE_BY_STYLE.m) + 1) * shape.props.scale
 
-	const paths: React.ReactNode[] = []
-	// Performance: sample fewer dabs per segment to keep stroke rendering responsive.
-	// Apply zoom-aware degradation: at far zoom levels, increase sample length (fewer dabs)
-	const baseMaxSampleLength = Math.max(4.5, strokeWidth * 2.4)
-	const zoomLevel = editorZoomRef.current
-	let maxSampleLength = baseMaxSampleLength
-	
-	// Degrade sampling quality at far zoom levels
-	if (zoomLevel < 0.5) {
-		maxSampleLength = baseMaxSampleLength * 2 // 2x stride at <50% zoom
-	} else if (zoomLevel < 1) {
-		maxSampleLength = baseMaxSampleLength * 1.2 // 1.2x stride at 50-100% zoom
+	const stride = Math.max(1, Math.floor(localPressurePoints.length / 64))
+	let geoHash = 0
+	for (let i = 0; i < localPressurePoints.length; i += stride) {
+		const p = localPressurePoints[i]
+		geoHash = (geoHash * 31 + ((p.x * 1000) | 0)) & 0xffffffff
+		geoHash = (geoHash * 31 + ((p.y * 1000) | 0)) & 0xffffffff
+		geoHash = (geoHash * 31 + ((p.pressure * 1000) | 0)) & 0xffffffff
 	}
+
+	const zoomBucket = Math.floor(editorZoomRef.current * 4) / 4
+	const qualityToken = 'full'
+	const motionToken = 'stable'
+	const brushBitmap = activeBrushTipRef.current
+	const brushToken = brushBitmap ? `bitmap:${brushBitmap.width}x${brushBitmap.height}` : 'nobmp'
+	const cacheKey = [
+		shape.id,
+		ribbonRenderEpoch,
+		localPressurePoints.length,
+		geoHash,
+		zoomBucket,
+		qualityToken,
+		motionToken,
+		activeStampShapeModeRef.current,
+		brushToken,
+		pencilOpacitySensitivity.toFixed(2),
+		pencilCrossSectionAspectRatio.toFixed(2),
+		shape.props.color,
+		shape.props.size,
+		shape.props.scale?.toFixed(2) ?? '1',
+	].join('|')
+	const cached = ribbonCache.get(shape.id)
+	const cacheValid = cached?.key === cacheKey
+
+	if (cacheValid) {
+		return cached.node
+	}
+
+	const paths: React.ReactNode[] = []
+	const maxSampleLength = Math.max(3.2, strokeWidth * 1.65)
 	
 	const stampShapeMode = activeStampShapeModeRef.current
 
 	if (stampShapeMode === 'circle') {
-		return buildCircleStampStroke(localPressurePoints, strokeColor, strokeWidth, maxSampleLength, shape.id)
+		const circleStamp = buildCircleStampStroke(
+			localPressurePoints,
+			strokeColor,
+			strokeWidth,
+			maxSampleLength,
+			shape.id
+		)
+		return circleStamp && React.isValidElement(circleStamp)
+			? rememberRibbonNode(shape.id, cacheKey, circleStamp)
+			: null
 	}
 
 	if (stampShapeMode === 'rectangle') {
-		return buildRectangleStampStroke(localPressurePoints, strokeColor, strokeWidth, maxSampleLength, shape.id)
+		const rectangleStamp = buildRectangleStampStroke(
+			localPressurePoints,
+			strokeColor,
+			strokeWidth,
+			maxSampleLength,
+			shape.id
+		)
+		return rectangleStamp && React.isValidElement(rectangleStamp)
+			? rememberRibbonNode(shape.id, cacheKey, rectangleStamp)
+			: null
 	}
 
-	// Check if we should use a brush bitmap stamp instead of polygon rendering
-	const brushBitmap = activeBrushTipRef.current
-	const useBrushStamp = brushBitmap !== null
+	if (stampShapeMode === 'auto') {
+		const autoCircleStamp = buildCircleStampStroke(
+			localPressurePoints,
+			strokeColor,
+			strokeWidth,
+			maxSampleLength,
+			shape.id
+		)
+		return autoCircleStamp && React.isValidElement(autoCircleStamp)
+			? rememberRibbonNode(shape.id, cacheKey, autoCircleStamp)
+			: null
+	}
+
+	// SVG bitmap dab stamping currently produces harsh star-like artifacts in Obsidian's
+	// runtime renderer, so prefer polygon ribbon rendering for stable visuals.
+	const useBrushStamp = false
 
 	if (useBrushStamp && brushBitmap) {
 		// Use brush bitmap stamping
@@ -299,13 +475,16 @@ function buildPressureSampledRibbonStroke(shape: TLDrawShape, baseElement: React
 		} catch (error) {
 			console.error('[PencilDrawShapeUtil] Failed to convert brush bitmap to data URL:', error)
 			// Fall back to polygon rendering
-			return buildPolygonRibbonStroke(
+			const polygonFallback = buildPolygonRibbonStroke(
 				shape,
 				localPressurePoints,
 				strokeColor,
 				strokeWidth,
 				maxSampleLength
 			)
+			return polygonFallback && React.isValidElement(polygonFallback)
+				? rememberRibbonNode(shape.id, cacheKey, polygonFallback)
+				: null
 		}
 
 		for (let i = 0; i < localPressurePoints.length - 1; i++) {
@@ -354,22 +533,26 @@ function buildPressureSampledRibbonStroke(shape: TLDrawShape, baseElement: React
 		}
 	} else {
 		// Fall back to polygon rendering when no brush bitmap
-		return buildPolygonRibbonStroke(
+		const polygonFallback = buildPolygonRibbonStroke(
 			shape,
 			localPressurePoints,
 			strokeColor,
 			strokeWidth,
 			maxSampleLength
 		)
+		return polygonFallback && React.isValidElement(polygonFallback)
+			? rememberRibbonNode(shape.id, cacheKey, polygonFallback)
+			: null
 	}
 
 	if (paths.length === 0) return null
 
-	return (
+	const result = (
 		<g pointerEvents="none">
 			{paths}
 		</g>
 	)
+	return rememberRibbonNode(shape.id, cacheKey, result)
 }
 
 /**
@@ -377,17 +560,7 @@ function buildPressureSampledRibbonStroke(shape: TLDrawShape, baseElement: React
  * At very low zoom, we skip more samples to reduce render load.
  */
 function getZoomAwareStride(sampleCount: number): number {
-	const zoomLevel = editorZoomRef.current
-	const baseStride = sampleCount > 20 ? 2 : 1
-	
-	// At zoom < 0.4, use 4x stride (every 4th sample)
-	// At zoom 0.4-0.5, use 2x stride
-	if (zoomLevel < 0.4) {
-		return baseStride * 4
-	} else if (zoomLevel < 0.5) {
-		return baseStride * 2
-	}
-	return baseStride
+	return sampleCount > 28 ? 2 : 1
 }
 
 function buildCircleStampStroke(
@@ -399,6 +572,10 @@ function buildCircleStampStroke(
 ): React.ReactNode {
 	const paths: React.ReactNode[] = []
 	const zoomLevel = editorZoomRef.current
+	const shouldUseSoftFilter = zoomLevel >= 0.45
+	const opacityFloor = 0.065
+	const opacityCeiling = 0.46
+	const opacityScale = 0.56
 
 	for (let i = 0; i < localPressurePoints.length - 1; i++) {
 		const p1 = localPressurePoints[i]
@@ -420,30 +597,20 @@ function buildCircleStampStroke(
 			const endOpacity = getPressureOpacityForPoint(endPoint.pressure)
 			const averagePressure = (startPoint.pressure + endPoint.pressure) / 2
 			const averageOpacity = (startOpacity + endOpacity) / 2
-			const sampledSize = strokeWidth * lerp(0.72, 0.96, averagePressure)
+			const sampledSize = strokeWidth * lerp(0.78, 1.02, averagePressure)
 			const baseRadius = Math.max(0.2, sampledSize / 2)
-			
-			// At very low zoom (< 0.4), use single layer; otherwise use full 3-layer effect
-			const layers = zoomLevel < 0.4 
-				? [{ scale: 1, opacity: 0.5 }]
-				: [
-					{ scale: 1.18, opacity: 0.12 },
-					{ scale: 0.92, opacity: 0.34 },
-					{ scale: 0.68, opacity: 0.58 },
-				]
 
-			for (const [layerIndex, layer] of layers.entries()) {
-				paths.push(
-					<circle
-						key={`${shapeId}-circle-stamp-${i}-${sampleIndex}-${layerIndex}`}
-						cx={centerX}
-						cy={centerY}
-						r={baseRadius * layer.scale}
-						fill={strokeColor}
-						fillOpacity={Math.max(0.04, Math.min(0.42, averageOpacity * layer.opacity))}
-					/>
-				)
-			}
+			paths.push(
+				<circle
+					key={`${shapeId}-circle-stamp-${i}-${sampleIndex}`}
+					cx={centerX}
+					cy={centerY}
+					r={baseRadius}
+					fill={strokeColor}
+					fillOpacity={Math.max(opacityFloor, Math.min(opacityCeiling, averageOpacity * opacityScale))}
+					filter={shouldUseSoftFilter ? 'url(#ptl-soft-dab-filter)' : undefined}
+				/>
+			)
 		}
 	}
 
@@ -458,7 +625,7 @@ function buildRectangleStampStroke(
 	strokeWidth: number,
 	maxSampleLength: number,
 	shapeId: string
-): React.ReactNode {
+): React.ReactElement | null {
 	const paths: React.ReactNode[] = []
 
 	for (let i = 0; i < localPressurePoints.length - 1; i++) {
@@ -523,7 +690,7 @@ function buildPolygonRibbonStroke(
 	strokeColor: string,
 	strokeWidth: number,
 	maxSampleLength: number
-): React.ReactNode {
+): React.ReactElement | null {
 	const paths: React.ReactNode[] = []
 
 	for (let i = 0; i < localPressurePoints.length - 1; i++) {
@@ -691,11 +858,17 @@ function applyStrokeStyling(node: React.ReactNode, style: React.CSSProperties): 
 
 function findFirstPathElement(
 	node: React.ReactNode
-): React.ReactElement<{ stroke?: string; strokeWidth?: number; style?: React.CSSProperties }> | null {
+): React.ReactElement<{
+	stroke?: string
+	fill?: string
+	strokeWidth?: number
+	style?: React.CSSProperties
+}> | null {
 	if (!React.isValidElement(node)) return null
 	if (node.type === 'path') {
 		return node as React.ReactElement<{
 			stroke?: string
+			fill?: string
 			strokeWidth?: number
 			style?: React.CSSProperties
 		}>
@@ -787,61 +960,122 @@ function buildPressureGradientOverlay(
 	)
 }
 
+function isShapeNearViewport(shape: TLDrawShape): boolean {
+	const editor = editorRef.current
+	if (!editor) return true
+
+	const viewport = editor.getViewportPageBounds()
+	const margin = Math.max(viewport.maxX - viewport.minX, viewport.maxY - viewport.minY) * 1.5
+	const bounds = editor.getShapePageBounds(shape)
+	if (!bounds) return true
+
+	return (
+		bounds.maxX >= viewport.minX - margin &&
+		bounds.minX <= viewport.maxX + margin &&
+		bounds.maxY >= viewport.minY - margin &&
+		bounds.minY <= viewport.maxY + margin
+	)
+}
+
+/**
+ * Real-time pressure-sampled circle renderer.
+ * Renders overlapping circles along the stroke path, sized and opacified by pressure.
+ * No caching, no mode switching—just immediate circle overlay on top of base stroke.
+ */
+function buildRealtimePressureOverlay(shape: TLDrawShape, color: string, baseWidth: number): React.ReactElement | null {
+	const points = getLocalPressurePointsFromShape(shape)
+	if (!points.length) return null
+
+	const circles: React.ReactElement[] = []
+
+	// For each segment, interpolate circles between consecutive points
+	for (let i = 0; i < points.length - 1; i++) {
+		const p1 = points[i]
+		const p2 = points[i + 1]
+
+		// Linear interpolation: one circle every ~4 pixels
+		const dx = p2.x - p1.x
+		const dy = p2.y - p1.y
+		const dist = Math.hypot(dx, dy)
+		const steps = Math.max(1, Math.ceil(dist / 4))
+
+		for (let step = 0; step <= steps; step++) {
+			const t = steps === 0 ? 0 : step / steps
+
+			const x = p1.x + dx * t
+			const y = p1.y + dy * t
+			const pressure = p1.pressure + (p2.pressure - p1.pressure) * t
+
+			// Pressure controls size and opacity
+			const radius = baseWidth * (0.6 + pressure * 0.4)
+			const opacity = 0.1 + pressure * 0.5
+
+			circles.push(
+				React.createElement('circle', {
+					key: `circle-${i}-${step}`,
+					cx: x,
+					cy: y,
+					r: radius,
+					fill: color,
+					fillOpacity: opacity,
+				})
+			)
+		}
+	}
+
+	return circles.length ? React.createElement('g', null, ...circles) : null
+}
+
 /**
  * Pencil draw shape util that keeps the built-in draw geometry/rendering, but
  * applies a grain filter and pressure-based opacity when the pencil tool has
  * captured pressure data for the shape.
  */
 export class PencilDrawShapeUtil extends DrawShapeUtil {
-	private shouldBypassRibbonForDebugShape(shape: TLDrawShape): boolean {
-		const meta = (shape as { meta?: Record<string, unknown> }).meta
-		return meta?.ptlDebugNoRibbon === true
-	}
-
 	override component(shape: TLDrawShape) {
+		if (!isShapeNearViewport(shape)) {
+			const stale = ribbonCache.get(shape.id)
+			if (stale) return ensureElement(wrapForHtmlRender(stale.node))
+			return ensureElement(super.component(shape))
+		}
+
 		const element = super.component(shape)
-		if (this.shouldBypassRibbonForDebugShape(shape)) {
-			return element
-		}
-		const ribbonStroke = buildPressureSampledRibbonStroke(shape, element)
-		// Never return an empty group for a valid draw shape; keep at least base element visible.
-		if (pencilCrossSectionAspectRatio !== 1 && ribbonStroke) {
-			return wrapForHtmlRender(ribbonStroke)
-		}
+		const ribbonStroke = pencilSampledOverlayEnabledRef.current
+			? buildPressureSampledRibbonStroke(shape, element)
+			: null
+
 		if (ribbonStroke) {
-			return React.createElement(
-				React.Fragment,
-				null,
-				pencilBaseStrokeEnabled ? cloneElementWithOpacity(element, getAveragePressureOpacity(shape)) : null,
-				wrapForHtmlRender(ribbonStroke)
+			return ensureElement(
+				wrapForHtmlRender(
+					<g>
+						{ribbonStroke}
+					</g>
+				)
 			)
 		}
+
 		const style = getPencilShapeStyle(shape)
-		if (!pencilFallbackStylingEnabled) return element
-		return style ? applyStrokeStyling(element, style) : element
+		if (!pencilFallbackStylingEnabledRef.current) return ensureElement(element)
+		return ensureElement(style ? applyStrokeStyling(element, style) : element)
 	}
 
 	override toSvg(shape: TLDrawShape, ctx: SvgExportContext) {
 		const element = super.toSvg(shape, ctx)
-		if (this.shouldBypassRibbonForDebugShape(shape)) {
-			return element
-		}
-		const ribbonStroke = buildPressureSampledRibbonStroke(shape, element)
-		// Never export an empty group for a valid draw shape; keep at least base element visible.
-		if (pencilCrossSectionAspectRatio !== 1 && ribbonStroke) {
-			return ribbonStroke
-		}
+		const ribbonStroke = pencilSampledOverlayEnabledRef.current
+			? buildPressureSampledRibbonStroke(shape, element)
+			: null
+
 		if (ribbonStroke) {
-			return React.createElement(
-				React.Fragment,
-				null,
-				pencilBaseStrokeEnabled ? cloneElementWithOpacity(element, getAveragePressureOpacity(shape)) : null,
-				ribbonStroke
+			return ensureElement(
+				<g>
+					{ribbonStroke}
+				</g>
 			)
 		}
+
 		const style = getPencilShapeStyle(shape)
-		if (!pencilFallbackStylingEnabled) return element
-		return style ? applyStrokeStyling(element, style) : element
+		if (!pencilFallbackStylingEnabledRef.current) return ensureElement(element)
+		return ensureElement(style ? applyStrokeStyling(element, style) : element)
 	}
 }
 

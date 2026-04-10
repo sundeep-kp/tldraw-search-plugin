@@ -29,6 +29,7 @@ export function createPencilGrainFilter(filterId: string, intensity: number = 0.
 	displace.setAttribute('scale', `${intensity * 3}`) // Increased multiplier for more visible effect
 	displace.setAttribute('xChannelSelector', 'R')
 	displace.setAttribute('yChannelSelector', 'G')
+	displace.setAttribute('result', 'displaced')
 
 	// Add turbulence for luminosity variation (grain appearance)
 	const feTurbulence2 = document.createElementNS('http://www.w3.org/2000/svg', 'feTurbulence')
@@ -38,23 +39,31 @@ export function createPencilGrainFilter(filterId: string, intensity: number = 0.
 	feTurbulence2.setAttribute('result', 'grain')
 	feTurbulence2.setAttribute('seed', '42')
 
-	// Overlay grain as opacity variation
-	const composite = document.createElementNS('http://www.w3.org/2000/svg', 'feComposite')
-	composite.setAttribute('in', 'SourceGraphic')
-	composite.setAttribute('in2', 'grain')
-	composite.setAttribute('operator', 'multiply')
-	composite.setAttribute('result', 'textured')
+	// Overlay grain using a standards-compliant SVG blend mode.
+	const blend = document.createElementNS('http://www.w3.org/2000/svg', 'feBlend')
+	blend.setAttribute('in', 'displaced')
+	blend.setAttribute('in2', 'grain')
+	blend.setAttribute('mode', 'multiply')
+	blend.setAttribute('result', 'textured')
+
+	// Keep grain strictly inside the source stroke alpha to avoid rectangle artifacts.
+	const maskToAlpha = document.createElementNS('http://www.w3.org/2000/svg', 'feComposite')
+	maskToAlpha.setAttribute('in', 'textured')
+	maskToAlpha.setAttribute('in2', 'SourceAlpha')
+	maskToAlpha.setAttribute('operator', 'in')
+	maskToAlpha.setAttribute('result', 'texturedMasked')
 
 	// Optional: add slight color shift for pencil warmth
 	const colorMatrix = document.createElementNS('http://www.w3.org/2000/svg', 'feColorMatrix')
-	colorMatrix.setAttribute('in', 'textured')
+	colorMatrix.setAttribute('in', 'texturedMasked')
 	colorMatrix.setAttribute('type', 'saturate')
 	colorMatrix.setAttribute('values', '0.95')
 
 	filter.appendChild(turbulence)
 	filter.appendChild(displace)
 	filter.appendChild(feTurbulence2)
-	filter.appendChild(composite)
+	filter.appendChild(blend)
+	filter.appendChild(maskToAlpha)
 	filter.appendChild(colorMatrix)
 
 	return filter
@@ -115,6 +124,21 @@ export function createPencilGrainPattern(patternId: string, scale: number = 1): 
 	return pattern
 }
 
+function createSoftDabFilter(filterId: string): SVGFilterElement {
+	const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter')
+	filter.id = filterId
+	filter.setAttribute('x', '-20%')
+	filter.setAttribute('y', '-20%')
+	filter.setAttribute('width', '140%')
+	filter.setAttribute('height', '140%')
+
+	const blur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur')
+	blur.setAttribute('stdDeviation', '0.22')
+	filter.appendChild(blur)
+
+	return filter
+}
+
 function sampleNoise2d(x: number, y: number): number {
 	const t = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453
 	return t - Math.floor(t)
@@ -170,6 +194,10 @@ export function injectPencilTexureFilters(svgElement: SVGSVGElement): void {
 
 	if (!defs.querySelector('#pencil-grain-pattern')) {
 		defs.appendChild(createPencilGrainPattern('pencil-grain-pattern', 1.2))
+	}
+
+	if (!defs.querySelector('#ptl-soft-dab-filter')) {
+		defs.appendChild(createSoftDabFilter('ptl-soft-dab-filter'))
 	}
 }
 

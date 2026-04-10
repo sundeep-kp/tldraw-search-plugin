@@ -113,6 +113,11 @@ import {
 import {
 	PENCIL_SHAPE_UTILS,
 	activeStampShapeModeRef,
+	cameraMovingRef,
+	claimPencilRendererOwner,
+	isPencilRendererOwner,
+	invalidatePencilRibbonCache,
+	releasePencilRendererOwner,
 	setPencilBaseStrokeEnabled,
 	setPencilDefaultStrokeEnabled,
 	setPencilFallbackStylingEnabled,
@@ -121,8 +126,13 @@ import {
 	setPencilSampledOverlayEnabled,
 	activeBrushTipRef,
 	editorZoomRef,
+	editorRef,
 } from 'src/tldraw/rendering/pencil-draw-shape-util'
-import { applyGrainToDab, getPressureOpacityStyle } from 'src/tldraw/rendering/pencil-texture'
+import {
+	applyGrainToDab,
+	getPressureOpacityStyle,
+	injectPencilTexureFilters,
+} from 'src/tldraw/rendering/pencil-texture'
 import PluginKeyboardShortcutsDialog from './PluginKeyboardShortcutsDialog'
 import PluginQuickActions from './PluginQuickActions'
 import {
@@ -1061,7 +1071,6 @@ const TldrawApp = ({
 	)
 
 	const [isFocused, setIsFocused] = React.useState(false)
-	const [isCameraMoving, setIsCameraMoving] = React.useState(false)
 	const [overlayRenderTick, setOverlayRenderTick] = React.useState(0)
 	const [isSearchPanelOpen, setIsSearchPanelOpen] = React.useState(false)
 	const [isPlaylistPanelOpen, setIsPlaylistPanelOpen] = React.useState(false)
@@ -1132,8 +1141,11 @@ const TldrawApp = ({
 	const activePointerIdRef = React.useRef<number | null>(null)
 	const saveTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 	const cameraMotionTimerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+	const renderKickRafRef = React.useRef<number | null>(null)
+	const lastCameraMotionAtRef = React.useRef(0)
 	const isCameraMovingRef = React.useRef(false)
 	const lastCameraRef = React.useRef<{ x: number; y: number; z: number } | null>(null)
+	const suppressMotionMarkingRef = React.useRef(false)  // Only suppress user pan/zoom detection, not debounce stops
 	const suppressScrubArtifactUntilRef = React.useRef(0)
 	const scrubCanceledShapeIdsRef = React.useRef(new Set<string>())
 	const bootstrappedRecognitionByDocumentRef = React.useRef(new Set<string>())
@@ -1194,6 +1206,7 @@ const TldrawApp = ({
 		const { currTldrawEditor } = plugin
 		if (currTldrawEditor !== editor) {
 			if (currTldrawEditor) {
+				releasePencilRendererOwner(currTldrawEditor)
 				currTldrawEditor.blur()
 			}
 			if (isMounting && !focusOnMount) {
@@ -1204,6 +1217,7 @@ const TldrawApp = ({
 				editor.focus()
 				setIsFocused(true)
 				plugin.currTldrawEditor = editor
+				claimPencilRendererOwner(editor)
 			}
 		}
 	}
@@ -1598,14 +1612,22 @@ const TldrawApp = ({
 		]
 	)
 
-	// Keep renderer-facing refs in sync for draw-shape stamping.
-	activeBrushTipRef.current = activeBrushTip.current
-	activeStampShapeModeRef.current = activeStampShapeMode.current
+	// Keep renderer-facing refs in sync for draw-shape stamping only for the owning editor.
+	React.useEffect(() => {
+		if (!editor || !isPencilRendererOwner(editor)) return
+		activeBrushTipRef.current = activeBrushTip.current
+		activeStampShapeModeRef.current = activeStampShapeMode.current
+	}, [
+		activeStampShapeModeState,
+		editor,
+		runtimeSelectedPresetId,
+		runtimeCustomStampPreset,
+		userSettings.handwritingRecognition?.kritaStampShape,
+	])
 
 	const clearCanvas = React.useCallback((canvas: HTMLCanvasElement) => {
 		const ctx = canvas.getContext('2d')
 		if (!ctx) return
-		ctx.save()
 		ctx.setTransform(1, 0, 0, 1, 0, 0)
 		ctx.clearRect(0, 0, canvas.width, canvas.height)
 		ctx.restore()
@@ -2825,23 +2847,63 @@ const TldrawApp = ({
 
 	React.useEffect(() => {
 		if (!editor) return
+		const cameraMotionHoldoffMs = 320
 
-		const markCameraMoving = () => {
+		// New editor/document lifecycle: reset local tracking.
+		lastCameraRef.current = null
+		lastCameraMotionAtRef.current = 0
+		isCameraMovingRef.current = false
+		if (isPencilRendererOwner(editor)) {
+			cameraMovingRef.current = false
+			invalidatePencilRibbonCache()
+		}
+
+		const stopCameraMoving = () => {
 			if (!isCameraMovingRef.current) {
-				isCameraMovingRef.current = true
-				setIsCameraMoving(true)
+				return
 			}
-			if (cameraMotionTimerRef.current) {
+			isCameraMovingRef.current = false
+			if (isPencilRendererOwner(editor)) {
+				cameraMovingRef.current = false
+				invalidatePencilRibbonCache()
+				suppressMotionMarkingRef.current = true
+				editor.updateInstanceState({ isChangingStyle: true })
+				if (renderKickRafRef.current !== null) {
+					cancelAnimationFrame(renderKickRafRef.current)
+				}
+				renderKickRafRef.current = window.requestAnimationFrame(() => {
+					editor.updateInstanceState({ isChangingStyle: false })
+					renderKickRafRef.current = null
+					// Nested RAF: release suppress only after the false call's change event has propagated
+					requestAnimationFrame(() => {
+						suppressMotionMarkingRef.current = false
+					})
+				})
+			}
+		}
+
+		const scheduleCameraStop = () => {
+			if (cameraMotionTimerRef.current !== undefined) {
 				clearTimeout(cameraMotionTimerRef.current)
 			}
 			cameraMotionTimerRef.current = setTimeout(() => {
-				isCameraMovingRef.current = false
-				setIsCameraMoving(false)
 				cameraMotionTimerRef.current = undefined
-			}, 140)
+				stopCameraMoving()
+			}, cameraMotionHoldoffMs)
+		}
+
+		const markCameraMoving = () => {
+			if (!isPencilRendererOwner(editor)) return
+			lastCameraMotionAtRef.current = performance.now()
+			if (!isCameraMovingRef.current) {
+				isCameraMovingRef.current = true
+				cameraMovingRef.current = true
+			}
+			scheduleCameraStop()
 		}
 
 		const onEditorChange = () => {
+			if (!isPencilRendererOwner(editor)) return
 			const cam = editor.getCamera()
 			const last = lastCameraRef.current
 			
@@ -2855,7 +2917,11 @@ const TldrawApp = ({
 
 			if (cam.x !== last.x || cam.y !== last.y || cam.z !== last.z) {
 				lastCameraRef.current = { x: cam.x, y: cam.y, z: cam.z }
-				markCameraMoving()
+				// Only suppress if this is a self-inflicted style update (from our effect's updateInstanceState)
+				// This allows the debounce timer to properly fire and stop motion detection
+				if (!suppressMotionMarkingRef.current) {
+					markCameraMoving()
+				}
 			}
 		}
 
@@ -2864,12 +2930,16 @@ const TldrawApp = ({
 
 		return () => {
 			editor.off('change', onEditorChange)
-			if (cameraMotionTimerRef.current) {
+			if (renderKickRafRef.current !== null) {
+				cancelAnimationFrame(renderKickRafRef.current)
+				renderKickRafRef.current = null
+			}
+			if (cameraMotionTimerRef.current !== undefined) {
 				clearTimeout(cameraMotionTimerRef.current)
 				cameraMotionTimerRef.current = undefined
 			}
-			isCameraMovingRef.current = false
-			setIsCameraMoving(false)
+			stopCameraMoving()
+			releasePencilRendererOwner(editor)
 		}
 	}, [editor])
 
@@ -2901,48 +2971,51 @@ const TldrawApp = ({
 
 	// Force tldraw to invalidate render cache when renderer settings change
 	const invalidateDrawShapeCache = React.useCallback(() => {
-		if (!editor) return
-		try {
-			if (typeof editor.getCurrentPageShapes !== 'function') return
-			const allShapes = editor.getCurrentPageShapes().filter((s) => s.type === 'draw')
-			if (allShapes.length === 0) return
+		if (editor && !isPencilRendererOwner(editor)) return
+		invalidatePencilRibbonCache()
 
-			// Dummy update: set x to itself to trigger cache invalidation.
-			editor.updateShapes(
-				allShapes.map((shape) => ({
-					id: shape.id,
-					type: shape.type,
-					x: shape.x,
-				}))
-			)
-		} catch (error) {
-			console.warn('[TldrawApp] cache invalidation skipped', error)
+		if (!editor) return
+
+		// Force a lightweight editor repaint so draw-shape util mode transitions are applied
+		// immediately after moving/stable flag changes.
+		suppressMotionMarkingRef.current = true
+		editor.updateInstanceState({ isChangingStyle: true })
+		if (renderKickRafRef.current !== null) {
+			cancelAnimationFrame(renderKickRafRef.current)
 		}
+		renderKickRafRef.current = window.requestAnimationFrame(() => {
+			editor.updateInstanceState({ isChangingStyle: false })
+			renderKickRafRef.current = null
+			// Nested RAF: release suppress only after false call's change event has propagated
+			requestAnimationFrame(() => {
+				suppressMotionMarkingRef.current = false
+			})
+		})
 	}, [editor])
 
-	React.useEffect(() => {
-		const effectiveDefaultStrokeEnabled = isCameraMoving
+	const applyRendererFlags = React.useCallback(() => {
+		const effectiveDefaultStrokeEnabled = isCameraMovingRef.current
 			? true
 			: forceVisibleSelectedDrawDiagnostic
 			? true
 			: useKritaRasterPipeline
 				? false
 				: pencilDefaultStrokeEnabled
-		const effectiveBaseStrokeEnabled = isCameraMoving
+		const effectiveBaseStrokeEnabled = isCameraMovingRef.current
 			? true
 			: forceVisibleSelectedDrawDiagnostic
 			? true
 			: useKritaRasterPipeline
 				? false
 				: pencilBaseStrokeEnabled
-		const effectiveSampledOverlayEnabled = isCameraMoving
+		const effectiveSampledOverlayEnabled = isCameraMovingRef.current
 			? false
 			: forceVisibleSelectedDrawDiagnostic
 			? false
 			: useKritaRasterPipeline
 				? true
 				: pencilSampledOverlayEnabled
-		const effectiveFallbackStylingEnabled = isCameraMoving
+		const effectiveFallbackStylingEnabled = isCameraMovingRef.current
 			? false
 			: forceVisibleSelectedDrawDiagnostic
 			? true
@@ -2954,21 +3027,20 @@ const TldrawApp = ({
 		setPencilBaseStrokeEnabled(effectiveBaseStrokeEnabled)
 		setPencilSampledOverlayEnabled(effectiveSampledOverlayEnabled)
 		setPencilFallbackStylingEnabled(effectiveFallbackStylingEnabled)
-		invalidateDrawShapeCache()
 	}, [
-		activeStampShapeModeState,
 		forceVisibleSelectedDrawDiagnostic,
-		hasSelectedKritaPreset,
-		hasSelectedDrawShape,
 		pencilBaseStrokeEnabled,
 		pencilDefaultStrokeEnabled,
 		pencilFallbackStylingEnabled,
-		useKritaRasterPipeline,
 		pencilSampledOverlayEnabled,
-		runtimeSelectedPresetId,
-		userSettings.debugMode,
-		invalidateDrawShapeCache,
+		useKritaRasterPipeline,
 	])
+
+	React.useEffect(() => {
+		if (!editor || !isPencilRendererOwner(editor)) return
+		applyRendererFlags()
+		invalidateDrawShapeCache()
+	}, [editor, applyRendererFlags, invalidateDrawShapeCache])
 
 	const googleBatchPolicy = React.useMemo(() => {
 		const source = userSettings.handwritingRecognition
@@ -5142,38 +5214,11 @@ const TldrawApp = ({
 						</div>
 				  ))
 				: null}
-			{userSettings.handwritingRecognition?.manualPredictButton ? (
-				<button className="ptl-handwriting-predict-button" onClick={triggerManualRecognition}>
-					Predict now
-				</button>
-			) : null}
-			<button
-				type="button"
-				className="ptl-krita-test-rect-button"
-				style={{
-					top: userSettings.handwritingRecognition?.manualPredictButton ? '84px' : '12px',
-				}}
-				onClick={createCenterRawRectangleStroke}
-				title="Create an erasable raw rectangle stroke at camera center"
-			>
-				Create Raw Rect Stroke
-			</button>
-			<button
-				type="button"
-				className="ptl-krita-test-rect-button"
-				style={{
-					top: userSettings.handwritingRecognition?.manualPredictButton ? '120px' : '48px',
-				}}
-				onClick={createCenterInkyRectangleStroke}
-				title="Create an erasable inky rectangle stroke at camera center"
-			>
-				Create Inky Rect Stroke
-			</button>
 			{selectedYoutubeEmbed ? (
 				<button
 					type="button"
 					className="ptl-handwriting-predict-button"
-					style={{ top: userSettings.handwritingRecognition?.manualPredictButton ? '156px' : '84px' }}
+					style={{ top: '12px' }}
 					onClick={() => setIsPlaylistPanelOpen((current) => !current)}
 				>
 					Playlist
@@ -5527,6 +5572,18 @@ const TldrawApp = ({
 				autoFocus={false}
 				onMount={(editor) => {
 					setAppState(editor) //setAppState is the function that stores the editor instance inside the plugin's internal state.
+					claimPencilRendererOwner(editor)
+					editorRef.current = editor
+					const ensurePencilFilters = (remainingAttempts: number) => {
+						const svg = editor.getContainer().querySelector('svg')
+						if (svg instanceof SVGSVGElement) {
+							injectPencilTexureFilters(svg)
+							return
+						}
+						if (remainingAttempts <= 0) return
+						window.requestAnimationFrame(() => ensurePencilFilters(remainingAttempts - 1))
+					}
+					window.requestAnimationFrame(() => ensurePencilFilters(10))
 				}}
 				shapeUtils={shapeUtils}
 				tools={tools}

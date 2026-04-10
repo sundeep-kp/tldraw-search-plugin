@@ -5,620 +5,174 @@ plugin:tldraw:42865 Connecting to Obsidian development server
 plugin:tldraw:42867 Event source created EventSource {url: 'http://localhost:5173/esbuild', withCredentials: false, readyState: 0, onopen: null, onmessage: null, …}
 plugin:tldraw:42904 Obsidian development server connection opened
 plugin:tldraw:42936 Adding setting tab {settingTab: TldrawSettingsTab}
-plugin:tldraw:158053 {assets: _ObsidianTLAssetStore}
-plugin:tldraw:143442 [Pencil Renderer] Default stroke enabled: false (changed: true )
-plugin:tldraw:143443 [Pencil Renderer] ⚠️ Module variable updated - tldraw cache may not invalidate
-plugin:tldraw:143429 [Pencil Renderer] Base stroke enabled: false
-plugin:tldraw:143433 [Pencil Renderer] Sampled overlay enabled: true
-plugin:tldraw:143437 [Pencil Renderer] Fallback styling enabled: false
-plugin:tldraw:146557 [TldrawApp] Pencil renderer toggles updated {forceVisibleSelectedDrawDiagnostic: false, hasSelectedDrawShape: false, useKritaRasterPipeline: true, pencilDefaultStrokeEnabled: false, pencilBaseStrokeEnabled: false, …}
-plugin:tldraw:146570 [TldrawApp] Pencil fallback styling toggled: false
-plugin:tldraw:148184 [handwriting-search] Ctrl+F listener attached {documentId: 'f46b67f7-2747-4345-91c9-ebc79d892b2e', hasEditor: false, target: 'window'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:RDCX1DLa9KLvBHN2JL3nH', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:2513 Warning: The tag <circle> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
-    at circle
-    at g
-    at InnerShape2 (plugin:tldraw:59470:26)
-    at ErrorBoundary (plugin:tldraw:55700:21)
-    at OptionalErrorBoundary (plugin:tldraw:55718:3)
-    at div
-    at Shape2 (plugin:tldraw:59352:7)
-    at ShapesToDisplay (plugin:tldraw:76773:18)
-    at div
-    at div
-    at DefaultCanvas (plugin:tldraw:76483:26)
-    at span
-    at eval (plugin:tldraw:96089:13)
-    at eval (plugin:tldraw:101608:13)
-    at Provider2 (plugin:tldraw:96161:15)
-    at Provider2 (plugin:tldraw:96161:15)
-    at Provider2 (plugin:tldraw:96161:15)
-    at Popper (plugin:tldraw:100273:11)
-    at Menu (plugin:tldraw:100775:11)
-    at Provider2 (plugin:tldraw:96161:15)
-    at ContextMenu (plugin:tldraw:101572:11)
-    at DefaultContextMenu2 (plugin:tldraw:132467:3)
-    at PluginContextMenu
-    at InsideOfEditorAndUiContext (plugin:tldraw:138715:3)
-    at TldrawUiInner2 (plugin:tldraw:138468:3)
-    at ToolsProvider (plugin:tldraw:107166:26)
-    at ActionsProvider (plugin:tldraw:107797:28)
-    at InternalProviders (plugin:tldraw:138428:3)
-    at TldrawUiComponentsProvider (plugin:tldraw:138356:3)
-    at BreakPointProvider (plugin:tldraw:105316:31)
-    at TldrawUiA11yProvider (plugin:tldraw:95058:33)
-    at TldrawUiDialogsProvider (plugin:tldraw:105929:36)
-    at Provider2 (plugin:tldraw:96161:15)
-    at Provider2 (plugin:tldraw:96161:15)
-    at CollectionProvider (plugin:tldraw:96227:13)
-    at ToastProvider (plugin:tldraw:103069:5)
-    at TldrawUiToastsProvider (plugin:tldraw:105984:35)
-    at TldrawUiEventsProvider (plugin:tldraw:95908:35)
-    at TldrawUiTranslationProvider (plugin:tldraw:95659:3)
-    at AssetUrlsProvider (plugin:tldraw:95097:3)
-    at Object.apply (plugin:tldraw:46248:12)
-    at TldrawUi2 (plugin:tldraw:138459:3)
-    at Layout (plugin:tldraw:73758:19)
-    at IdProvider (plugin:tldraw:55185:23)
-    at EditorProvider (plugin:tldraw:55204:27)
-    at ErrorBoundary (plugin:tldraw:55700:21)
-    at OptionalErrorBoundary (plugin:tldraw:55718:3)
-    at TldrawEditorWithReadyStore (plugin:tldraw:73574:3)
-    at EditorComponentsProvider (plugin:tldraw:74206:3)
-    at ContainerProvider2 (plugin:tldraw:55380:31)
-    at LicenseProvider (plugin:tldraw:73254:3)
-    at ErrorBoundary (plugin:tldraw:55700:21)
-    at OptionalErrorBoundary (plugin:tldraw:55718:3)
-    at div
-    at TldrawEditor2 (plugin:tldraw:73465:3)
-    at TldrawUiTranslationProvider (plugin:tldraw:95659:3)
-    at AssetUrlsProvider (plugin:tldraw:95097:3)
-    at Tldraw (plugin:tldraw:138603:5)
-    at div
-    at TldrawApp (plugin:tldraw:144949:3)
-    at TldrawInObsidianPluginProvider (plugin:tldraw:139270:3)
-printWarning @ plugin:tldraw:2513
-error @ plugin:tldraw:2497
-createElement18 @ plugin:tldraw:9547
-createInstance @ plugin:tldraw:10375
-completeWork @ plugin:tldraw:18330
-completeUnitOfWork @ plugin:tldraw:21266
-performUnitOfWork @ plugin:tldraw:21251
-workLoopSync @ plugin:tldraw:21182
-renderRootSync @ plugin:tldraw:21161
-performConcurrentWorkOnRoot @ plugin:tldraw:20720
-workLoop @ plugin:tldraw:2185
-flushWork @ plugin:tldraw:2164
-performWorkUntilDeadline @ plugin:tldraw:2372
-processImmediate @ node:internal/timers:485
-plugin:tldraw:2513 Warning: The tag <g> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
-    at g
-    at InnerShape2 (plugin:tldraw:59470:26)
-    at ErrorBoundary (plugin:tldraw:55700:21)
-    at OptionalErrorBoundary (plugin:tldraw:55718:3)
-    at div
-    at Shape2 (plugin:tldraw:59352:7)
-    at ShapesToDisplay (plugin:tldraw:76773:18)
-    at div
-    at div
-    at DefaultCanvas (plugin:tldraw:76483:26)
-    at span
-    at eval (plugin:tldraw:96089:13)
-    at eval (plugin:tldraw:101608:13)
-    at Provider2 (plugin:tldraw:96161:15)
-    at Provider2 (plugin:tldraw:96161:15)
-    at Provider2 (plugin:tldraw:96161:15)
-    at Popper (plugin:tldraw:100273:11)
-    at Menu (plugin:tldraw:100775:11)
-    at Provider2 (plugin:tldraw:96161:15)
-    at ContextMenu (plugin:tldraw:101572:11)
-    at DefaultContextMenu2 (plugin:tldraw:132467:3)
-    at PluginContextMenu
-    at InsideOfEditorAndUiContext (plugin:tldraw:138715:3)
-    at TldrawUiInner2 (plugin:tldraw:138468:3)
-    at ToolsProvider (plugin:tldraw:107166:26)
-    at ActionsProvider (plugin:tldraw:107797:28)
-    at InternalProviders (plugin:tldraw:138428:3)
-    at TldrawUiComponentsProvider (plugin:tldraw:138356:3)
-    at BreakPointProvider (plugin:tldraw:105316:31)
-    at TldrawUiA11yProvider (plugin:tldraw:95058:33)
-    at TldrawUiDialogsProvider (plugin:tldraw:105929:36)
-    at Provider2 (plugin:tldraw:96161:15)
-    at Provider2 (plugin:tldraw:96161:15)
-    at CollectionProvider (plugin:tldraw:96227:13)
-    at ToastProvider (plugin:tldraw:103069:5)
-    at TldrawUiToastsProvider (plugin:tldraw:105984:35)
-    at TldrawUiEventsProvider (plugin:tldraw:95908:35)
-    at TldrawUiTranslationProvider (plugin:tldraw:95659:3)
-    at AssetUrlsProvider (plugin:tldraw:95097:3)
-    at Object.apply (plugin:tldraw:46248:12)
-    at TldrawUi2 (plugin:tldraw:138459:3)
-    at Layout (plugin:tldraw:73758:19)
-    at IdProvider (plugin:tldraw:55185:23)
-    at EditorProvider (plugin:tldraw:55204:27)
-    at ErrorBoundary (plugin:tldraw:55700:21)
-    at OptionalErrorBoundary (plugin:tldraw:55718:3)
-    at TldrawEditorWithReadyStore (plugin:tldraw:73574:3)
-    at EditorComponentsProvider (plugin:tldraw:74206:3)
-    at ContainerProvider2 (plugin:tldraw:55380:31)
-    at LicenseProvider (plugin:tldraw:73254:3)
-    at ErrorBoundary (plugin:tldraw:55700:21)
-    at OptionalErrorBoundary (plugin:tldraw:55718:3)
-    at div
-    at TldrawEditor2 (plugin:tldraw:73465:3)
-    at TldrawUiTranslationProvider (plugin:tldraw:95659:3)
-    at AssetUrlsProvider (plugin:tldraw:95097:3)
-    at Tldraw (plugin:tldraw:138603:5)
-    at div
-    at TldrawApp (plugin:tldraw:144949:3)
-    at TldrawInObsidianPluginProvider (plugin:tldraw:139270:3)
-printWarning @ plugin:tldraw:2513
-error @ plugin:tldraw:2497
-createElement18 @ plugin:tldraw:9547
-createInstance @ plugin:tldraw:10375
-completeWork @ plugin:tldraw:18330
-completeUnitOfWork @ plugin:tldraw:21266
-performUnitOfWork @ plugin:tldraw:21251
-workLoopSync @ plugin:tldraw:21182
-renderRootSync @ plugin:tldraw:21161
-performConcurrentWorkOnRoot @ plugin:tldraw:20720
-workLoop @ plugin:tldraw:2185
-flushWork @ plugin:tldraw:2164
-performWorkUntilDeadline @ plugin:tldraw:2372
-processImmediate @ node:internal/timers:485
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:SWokIVW0J_MH7ZnppV5HW', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:aJbO3THG9PSh5EPSP-zvB', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:v6NX0AiZe0UHpLcYq_PK7', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143442 [Pencil Renderer] Default stroke enabled: false (changed: false )
-plugin:tldraw:143429 [Pencil Renderer] Base stroke enabled: false
-plugin:tldraw:143433 [Pencil Renderer] Sampled overlay enabled: true
-plugin:tldraw:143437 [Pencil Renderer] Fallback styling enabled: false
-plugin:tldraw:146557 [TldrawApp] Pencil renderer toggles updated {forceVisibleSelectedDrawDiagnostic: false, hasSelectedDrawShape: false, useKritaRasterPipeline: true, pencilDefaultStrokeEnabled: false, pencilBaseStrokeEnabled: false, …}
-plugin:tldraw:146570 [TldrawApp] Pencil fallback styling toggled: false
-plugin:tldraw:148235 [handwriting-search] Ctrl+F listener removed {documentId: 'f46b67f7-2747-4345-91c9-ebc79d892b2e', target: 'window'}
-plugin:tldraw:150776 undefined
-plugin:tldraw:150777 {viewState: {…}}
-plugin:tldraw:143442 [Pencil Renderer] Default stroke enabled: false (changed: false )
-plugin:tldraw:143429 [Pencil Renderer] Base stroke enabled: false
-plugin:tldraw:143433 [Pencil Renderer] Sampled overlay enabled: true
-plugin:tldraw:143437 [Pencil Renderer] Fallback styling enabled: false
-plugin:tldraw:146557 [TldrawApp] Pencil renderer toggles updated {forceVisibleSelectedDrawDiagnostic: false, hasSelectedDrawShape: false, useKritaRasterPipeline: true, pencilDefaultStrokeEnabled: false, pencilBaseStrokeEnabled: false, …}
-plugin:tldraw:146570 [TldrawApp] Pencil fallback styling toggled: false
-plugin:tldraw:146966 [handwriting] reload backfill complete {documentId: 'f46b67f7-2747-4345-91c9-ebc79d892b2e', drawShapes: 4, payloadsHydrated: 4, unattemptedPayloads: 0, payloadsRegenerated: 0, …}
+plugin:tldraw:158634 {assets: _ObsidianTLAssetStore}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: true, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:aWg4DoL1nUpb1fjKqDVlh , epoch: 0 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: true, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:j32BfA-57OeSI_1fK1EfV , epoch: 0 motionToken: stable
+plugin:tldraw:143601 [pencil-renderer] setPencilDefaultStrokeEnabled: old= true new= false
+plugin:tldraw:143604 [pencil-renderer] setPencilDefaultStrokeEnabled: CONFIRMED value is now false version: 1
+plugin:tldraw:143580 [pencil-renderer] setPencilBaseStrokeEnabled: old= true new= false
+plugin:tldraw:143583 [pencil-renderer] setPencilBaseStrokeEnabled: CONFIRMED value is now false version: 2
+plugin:tldraw:143594 [pencil-renderer] setPencilFallbackStylingEnabled: old= true new= false
+plugin:tldraw:143597 [pencil-renderer] setPencilFallbackStylingEnabled: CONFIRMED value is now false version: 3
 plugin:tldraw:142132 [handwriting] stroke listener initialized
-plugin:tldraw:148184 [handwriting-search] Ctrl+F listener attached {documentId: 'f46b67f7-2747-4345-91c9-ebc79d892b2e', hasEditor: true, target: 'window'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:147295 [pencil-scrub] onExit {documentId: 'f46b67f7-2747-4345-91c9-ebc79d892b2e', cancelCurrentStrokeOnExit: false, activeShapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:142132 [handwriting] extracted stroke geometry {shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', segments: 1, totalPoints: 174}
-plugin:tldraw:147673 [pencil] mapped pressure session to shape {documentId: 'f46b67f7-2747-4345-91c9-ebc79d892b2e', shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', rawPointsCount: 174, pressurePointsCount: 179, pressureMin: 0, …}
-plugin:tldraw:147690 [pencil] pressure shape ready for gradient render {documentId: 'f46b67f7-2747-4345-91c9-ebc79d892b2e', shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', topLevelOpacity: 1, pointCount: 179, pencilOpacitySensitivity: 2.88}
-plugin:tldraw:147715 [pencil] persisted draw shape pressure stats {documentId: 'f46b67f7-2747-4345-91c9-ebc79d892b2e', shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', topLevelOpacity: 1, segmentCount: 1, pointCount: 174, …}
-plugin:tldraw:147739 [handwriting] normalized stroke payload {documentId: 'f46b67f7-2747-4345-91c9-ebc79d892b2e', shapeId: 'shape:G7-xyvKiLlrxVK-r2a8FU', segments: 1, totalPoints: 174, storedPayloads: 5, …}
-plugin:tldraw:147758 [handwriting] recognition candidate {documentId: 'f46b67f7-2747-4345-91c9-ebc79d892b2e', groupId: 'google-batch-f46b67f7-2747-4345-91c9-ebc79d892b2e-3', shapeIds: Array(1), boundingBox: {…}, startedAt: 1775664974285, …}
-plugin:tldraw:143442 [Pencil Renderer] Default stroke enabled: false (changed: false )
-plugin:tldraw:143429 [Pencil Renderer] Base stroke enabled: false
-plugin:tldraw:143433 [Pencil Renderer] Sampled overlay enabled: true
-plugin:tldraw:143437 [Pencil Renderer] Fallback styling enabled: false
-plugin:tldraw:146557 [TldrawApp] Pencil renderer toggles updated {forceVisibleSelectedDrawDiagnostic: false, hasSelectedDrawShape: false, useKritaRasterPipeline: true, pencilDefaultStrokeEnabled: false, pencilBaseStrokeEnabled: false, …}
-plugin:tldraw:146570 [TldrawApp] Pencil fallback styling toggled: false
-plugin:tldraw:142132 [handwriting] stroke listener initialized
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:2513 Warning: The tag <polygon> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
-    at polygon
-    at g
-    at InnerShape2 (plugin:tldraw:59470:26)
-    at ErrorBoundary (plugin:tldraw:55700:21)
-    at OptionalErrorBoundary (plugin:tldraw:55718:3)
-    at div
-    at Shape2 (plugin:tldraw:59352:7)
-    at ShapesToDisplay (plugin:tldraw:76773:18)
-    at div
-    at div
-    at DefaultCanvas (plugin:tldraw:76483:26)
-    at span
-    at eval (plugin:tldraw:96089:13)
-    at eval (plugin:tldraw:101608:13)
-    at Provider2 (plugin:tldraw:96161:15)
-    at Provider2 (plugin:tldraw:96161:15)
-    at Provider2 (plugin:tldraw:96161:15)
-    at Popper (plugin:tldraw:100273:11)
-    at Menu (plugin:tldraw:100775:11)
-    at Provider2 (plugin:tldraw:96161:15)
-    at ContextMenu (plugin:tldraw:101572:11)
-    at DefaultContextMenu2 (plugin:tldraw:132467:3)
-    at PluginContextMenu
-    at InsideOfEditorAndUiContext (plugin:tldraw:138715:3)
-    at TldrawUiInner2 (plugin:tldraw:138468:3)
-    at ToolsProvider (plugin:tldraw:107166:26)
-    at ActionsProvider (plugin:tldraw:107797:28)
-    at InternalProviders (plugin:tldraw:138428:3)
-    at TldrawUiComponentsProvider (plugin:tldraw:138356:3)
-    at BreakPointProvider (plugin:tldraw:105316:31)
-    at TldrawUiA11yProvider (plugin:tldraw:95058:33)
-    at TldrawUiDialogsProvider (plugin:tldraw:105929:36)
-    at Provider2 (plugin:tldraw:96161:15)
-    at Provider2 (plugin:tldraw:96161:15)
-    at CollectionProvider (plugin:tldraw:96227:13)
-    at ToastProvider (plugin:tldraw:103069:5)
-    at TldrawUiToastsProvider (plugin:tldraw:105984:35)
-    at TldrawUiEventsProvider (plugin:tldraw:95908:35)
-    at TldrawUiTranslationProvider (plugin:tldraw:95659:3)
-    at AssetUrlsProvider (plugin:tldraw:95097:3)
-    at Object.apply (plugin:tldraw:46248:12)
-    at TldrawUi2 (plugin:tldraw:138459:3)
-    at Layout (plugin:tldraw:73758:19)
-    at IdProvider (plugin:tldraw:55185:23)
-    at EditorProvider (plugin:tldraw:55204:27)
-    at ErrorBoundary (plugin:tldraw:55700:21)
-    at OptionalErrorBoundary (plugin:tldraw:55718:3)
-    at TldrawEditorWithReadyStore (plugin:tldraw:73574:3)
-    at EditorComponentsProvider (plugin:tldraw:74206:3)
-    at ContainerProvider2 (plugin:tldraw:55380:31)
-    at LicenseProvider (plugin:tldraw:73254:3)
-    at ErrorBoundary (plugin:tldraw:55700:21)
-    at OptionalErrorBoundary (plugin:tldraw:55718:3)
-    at div
-    at TldrawEditor2 (plugin:tldraw:73465:3)
-    at TldrawUiTranslationProvider (plugin:tldraw:95659:3)
-    at AssetUrlsProvider (plugin:tldraw:95097:3)
-    at Tldraw (plugin:tldraw:138603:5)
-    at div
-    at TldrawApp (plugin:tldraw:144949:3)
-    at TldrawInObsidianPluginProvider (plugin:tldraw:139270:3)
-printWarning @ plugin:tldraw:2513
-error @ plugin:tldraw:2497
-createElement18 @ plugin:tldraw:9547
-createInstance @ plugin:tldraw:10375
-completeWork @ plugin:tldraw:18330
-completeUnitOfWork @ plugin:tldraw:21266
-performUnitOfWork @ plugin:tldraw:21251
-workLoopSync @ plugin:tldraw:21182
-renderRootSync @ plugin:tldraw:21161
-performSyncWorkOnRoot @ plugin:tldraw:20919
-flushSyncCallbacks @ plugin:tldraw:11158
-eval @ plugin:tldraw:20669
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-throttleToNextFrame @ plugin:tldraw:45046
-scheduleEffect @ plugin:tldraw:48548
-scheduleEffect @ plugin:tldraw:45505
-maybeScheduleEffect @ plugin:tldraw:45499
-flushChanges @ plugin:tldraw:45680
-commit @ plugin:tldraw:45613
-transaction @ plugin:tldraw:45735
-transact @ plugin:tldraw:45746
-batch @ plugin:tldraw:61759
-run @ plugin:tldraw:64984
-_flushEventsForTick @ plugin:tldraw:71356
-emit @ plugin:tldraw:29145
-tick @ plugin:tldraw:63647
-flush @ plugin:tldraw:45012
-tick @ plugin:tldraw:45029
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-throttleToNextFrame @ plugin:tldraw:45046
-scheduleEffect @ plugin:tldraw:48548
-scheduleEffect @ plugin:tldraw:45505
-maybeScheduleEffect @ plugin:tldraw:45499
-flushChanges @ plugin:tldraw:45680
-commit @ plugin:tldraw:45613
-transaction @ plugin:tldraw:45735
-transact @ plugin:tldraw:45746
-batch @ plugin:tldraw:61759
-run @ plugin:tldraw:64984
-_flushEventsForTick @ plugin:tldraw:71356
-emit @ plugin:tldraw:29145
-tick @ plugin:tldraw:63647
-flush @ plugin:tldraw:45012
-tick @ plugin:tldraw:45029
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-throttleToNextFrame @ plugin:tldraw:45046
-scheduleEffect @ plugin:tldraw:48548
-scheduleEffect @ plugin:tldraw:45505
-maybeScheduleEffect @ plugin:tldraw:45499
-flushChanges @ plugin:tldraw:45680
-commit @ plugin:tldraw:45613
-transaction @ plugin:tldraw:45735
-transact @ plugin:tldraw:45746
-batch @ plugin:tldraw:61759
-run @ plugin:tldraw:64984
-_flushEventsForTick @ plugin:tldraw:71356
-emit @ plugin:tldraw:29145
-tick @ plugin:tldraw:63647
-flush @ plugin:tldraw:45012
-tick @ plugin:tldraw:45029
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-throttleToNextFrame @ plugin:tldraw:45046
-scheduleEffect @ plugin:tldraw:48548
-scheduleEffect @ plugin:tldraw:45505
-maybeScheduleEffect @ plugin:tldraw:45499
-flushChanges @ plugin:tldraw:45680
-commit @ plugin:tldraw:45613
-transaction @ plugin:tldraw:45735
-transact @ plugin:tldraw:45746
-batch @ plugin:tldraw:61759
-run @ plugin:tldraw:64984
-_flushEventsForTick @ plugin:tldraw:71356
-emit @ plugin:tldraw:29145
-tick @ plugin:tldraw:63647
-flush @ plugin:tldraw:45012
-tick @ plugin:tldraw:45029
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-throttleToNextFrame @ plugin:tldraw:45046
-scheduleEffect @ plugin:tldraw:48548
-scheduleEffect @ plugin:tldraw:45505
-maybeScheduleEffect @ plugin:tldraw:45499
-flushChanges @ plugin:tldraw:45680
-commit @ plugin:tldraw:45613
-transaction @ plugin:tldraw:45735
-transact @ plugin:tldraw:45746
-batch @ plugin:tldraw:61759
-run @ plugin:tldraw:64984
-_flushEventsForTick @ plugin:tldraw:71356
-emit @ plugin:tldraw:29145
-tick @ plugin:tldraw:63647
-flush @ plugin:tldraw:45012
-tick @ plugin:tldraw:45029
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-throttleToNextFrame @ plugin:tldraw:45046
-scheduleEffect @ plugin:tldraw:48548
-scheduleEffect @ plugin:tldraw:45505
-maybeScheduleEffect @ plugin:tldraw:45499
-flushChanges @ plugin:tldraw:45680
-commit @ plugin:tldraw:45613
-transaction @ plugin:tldraw:45735
-transact @ plugin:tldraw:45746
-batch @ plugin:tldraw:61759
-run @ plugin:tldraw:64984
-_flushEventsForTick @ plugin:tldraw:71356
-emit @ plugin:tldraw:29145
-tick @ plugin:tldraw:63647
-flush @ plugin:tldraw:45012
-tick @ plugin:tldraw:45029
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-throttleToNextFrame @ plugin:tldraw:45046
-scheduleEffect @ plugin:tldraw:48548
-scheduleEffect @ plugin:tldraw:45505
-maybeScheduleEffect @ plugin:tldraw:45499
-flushChanges @ plugin:tldraw:45680
-commit @ plugin:tldraw:45613
-transaction @ plugin:tldraw:45735
-transact @ plugin:tldraw:45746
-batch @ plugin:tldraw:61759
-run @ plugin:tldraw:64984
-_flushEventsForTick @ plugin:tldraw:71356
-emit @ plugin:tldraw:29145
-tick @ plugin:tldraw:63647
-flush @ plugin:tldraw:45012
-tick @ plugin:tldraw:45029
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-throttleToNextFrame @ plugin:tldraw:45046
-scheduleEffect @ plugin:tldraw:48548
-scheduleEffect @ plugin:tldraw:45505
-maybeScheduleEffect @ plugin:tldraw:45499
-flushChanges @ plugin:tldraw:45680
-commit @ plugin:tldraw:45613
-transaction @ plugin:tldraw:45735
-transact @ plugin:tldraw:45746
-batch @ plugin:tldraw:61759
-run @ plugin:tldraw:64984
-_flushEventsForTick @ plugin:tldraw:71356
-emit @ plugin:tldraw:29145
-tick @ plugin:tldraw:63647
-flush @ plugin:tldraw:45012
-tick @ plugin:tldraw:45029
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-throttleToNextFrame @ plugin:tldraw:45046
-scheduleEffect @ plugin:tldraw:48548
-scheduleEffect @ plugin:tldraw:45505
-maybeScheduleEffect @ plugin:tldraw:45499
-flushChanges @ plugin:tldraw:45680
-commit @ plugin:tldraw:45613
-transaction @ plugin:tldraw:45735
-transact @ plugin:tldraw:45746
-batch @ plugin:tldraw:61759
-run @ plugin:tldraw:64984
-_flushEventsForTick @ plugin:tldraw:71356
-emit @ plugin:tldraw:29145
-tick @ plugin:tldraw:63647
-flush @ plugin:tldraw:45012
-tick @ plugin:tldraw:45029
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-throttleToNextFrame @ plugin:tldraw:45046
-scheduleEffect @ plugin:tldraw:48548
-scheduleEffect @ plugin:tldraw:45505
-maybeScheduleEffect @ plugin:tldraw:45499
-flushChanges @ plugin:tldraw:45680
-commit @ plugin:tldraw:45613
-transaction @ plugin:tldraw:45735
-transact @ plugin:tldraw:45746
-batch @ plugin:tldraw:61759
-run @ plugin:tldraw:64984
-_flushEventsForTick @ plugin:tldraw:71356
-emit @ plugin:tldraw:29145
-tick @ plugin:tldraw:63647
-flush @ plugin:tldraw:45012
-tick @ plugin:tldraw:45029
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-throttleToNextFrame @ plugin:tldraw:45046
-scheduleEffect @ plugin:tldraw:48548
-scheduleEffect @ plugin:tldraw:45505
-maybeScheduleEffect @ plugin:tldraw:45499
-flushChanges @ plugin:tldraw:45680
-commit @ plugin:tldraw:45613
-transaction @ plugin:tldraw:45735
-transact @ plugin:tldraw:45746
-batch @ plugin:tldraw:61759
-run @ plugin:tldraw:64984
-_flushEventsForTick @ plugin:tldraw:71356
-emit @ plugin:tldraw:29145
-tick @ plugin:tldraw:63647
-flush @ plugin:tldraw:45012
-tick @ plugin:tldraw:45029
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-requestAnimationFrame
-tick @ plugin:tldraw:45020
-eval @ plugin:tldraw:45022
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:147295 [pencil-scrub] onExit {documentId: 'f46b67f7-2747-4345-91c9-ebc79d892b2e', cancelCurrentStrokeOnExit: false, activeShapeId: 'shape:shRrQAQZHXVTPAwGupVyQ'}
-plugin:tldraw:143881 [PencilDrawShapeUtil.component] rendering shape {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', pencilDefaultStrokeEnabled: false, pencilCrossSectionAspectRatio: 1, willRender: 'empty-g'}
-plugin:tldraw:142132 [handwriting] extracted stroke geometry {shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', segments: 1, totalPoints: 143}
-plugin:tldraw:147673 [pencil] mapped pressure session to shape {documentId: 'f46b67f7-2747-4345-91c9-ebc79d892b2e', shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', rawPointsCount: 143, pressurePointsCount: 144, pressureMin: 0, …}
-plugin:tldraw:147690 [pencil] pressure shape ready for gradient render {documentId: 'f46b67f7-2747-4345-91c9-ebc79d892b2e', shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', topLevelOpacity: 1, pointCount: 144, pencilOpacitySensitivity: 2.88}
-plugin:tldraw:147715 [pencil] persisted draw shape pressure stats {documentId: 'f46b67f7-2747-4345-91c9-ebc79d892b2e', shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', topLevelOpacity: 1, segmentCount: 1, pointCount: 143, …}
-plugin:tldraw:147739 [handwriting] normalized stroke payload {documentId: 'f46b67f7-2747-4345-91c9-ebc79d892b2e', shapeId: 'shape:shRrQAQZHXVTPAwGupVyQ', segments: 1, totalPoints: 143, storedPayloads: 6, …}
-plugin:tldraw:147758 [handwriting] recognition candidate {documentId: 'f46b67f7-2747-4345-91c9-ebc79d892b2e', groupId: 'google-batch-f46b67f7-2747-4345-91c9-ebc79d892b2e-4', shapeIds: Array(1), boundingBox: {…}, startedAt: 1775664981673, …}
-plugin:tldraw:143442 [Pencil Renderer] Default stroke enabled: false (changed: false )
-plugin:tldraw:143429 [Pencil Renderer] Base stroke enabled: false
-plugin:tldraw:143433 [Pencil Renderer] Sampled overlay enabled: true
-plugin:tldraw:143437 [Pencil Renderer] Fallback styling enabled: false
-plugin:tldraw:146557 [TldrawApp] Pencil renderer toggles updated {forceVisibleSelectedDrawDiagnostic: false, hasSelectedDrawShape: true, useKritaRasterPipeline: true, pencilDefaultStrokeEnabled: false, pencilBaseStrokeEnabled: false, …}
-plugin:tldraw:146570 [TldrawApp] Pencil fallback styling toggled: false
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: stable
+plugin:tldraw:142132 [handwriting] extracted stroke geometry {shapeId: 'shape:tuUXrTtq0onD9uiatJEJI', segments: 1, totalPoints: 233}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143773 [buildPressureSampledRibbonStroke] cache HIT for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 3 motionToken: moving
+plugin:tldraw:143601 [pencil-renderer] setPencilDefaultStrokeEnabled: old= false new= true
+plugin:tldraw:143604 [pencil-renderer] setPencilDefaultStrokeEnabled: CONFIRMED value is now true version: 4
+plugin:tldraw:143580 [pencil-renderer] setPencilBaseStrokeEnabled: old= false new= true
+plugin:tldraw:143583 [pencil-renderer] setPencilBaseStrokeEnabled: CONFIRMED value is now true version: 5
+plugin:tldraw:143587 [pencil-renderer] setPencilSampledOverlayEnabled: old= true new= false
+plugin:tldraw:143590 [pencil-renderer] setPencilSampledOverlayEnabled: CONFIRMED value is now false version: 6
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: false, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: true, pencilDefaultStrokeEnabled: true}
+plugin:tldraw:143601 [pencil-renderer] setPencilDefaultStrokeEnabled: old= true new= false
+plugin:tldraw:143604 [pencil-renderer] setPencilDefaultStrokeEnabled: CONFIRMED value is now false version: 7
+plugin:tldraw:143580 [pencil-renderer] setPencilBaseStrokeEnabled: old= true new= false
+plugin:tldraw:143583 [pencil-renderer] setPencilBaseStrokeEnabled: CONFIRMED value is now false version: 8
+plugin:tldraw:143587 [pencil-renderer] setPencilSampledOverlayEnabled: old= false new= true
+plugin:tldraw:143590 [pencil-renderer] setPencilSampledOverlayEnabled: CONFIRMED value is now true version: 9
+plugin:tldraw:144154 [PencilDrawShapeUtil.component] called, flags: {pencilSampledOverlayEnabled: true, pencilFallbackStylingEnabled: false, pencilBaseStrokeEnabled: false, pencilDefaultStrokeEnabled: false}
+plugin:tldraw:143776 [buildPressureSampledRibbonStroke] cache MISS for shape:tuUXrTtq0onD9uiatJEJI , epoch: 8 motionToken: stable
+plugin:tldraw:143601 [pencil-renderer] setPencilDefaultStrokeEnabled: old= false new= true
+plugin:tldraw:143604 [pencil-renderer] setPencilDefaultStrokeEnabled: CONFIRMED value is now true version: 10
+plugin:tldraw:143580 [pencil-renderer] setPencilBaseStrokeEnabled: old= false new= true
+plugin:tldraw:143583 [pencil-renderer] setPencilBaseStrokeEnabled: CONFIRMED value is now true version: 11
+plugin:tldraw:143587 [pencil-renderer] setPencilSampledOverlayEnabled: old= true new= false
+plugin:tldraw:143590 [pencil-renderer] setPencilSampledOverlayEnabled: CONFIRMED value is now false version: 12
+plugin:tldraw:143601 [pencil-renderer] setPencilDefaultStrokeEnabled: old= true new= false
+plugin:tldraw:143604 [pencil-renderer] setPencilDefaultStrokeEnabled: CONFIRMED value is now false version: 13
+plugin:tldraw:143580 [pencil-renderer] setPencilBaseStrokeEnabled: old= true new= false
+plugin:tldraw:143583 [pencil-renderer] setPencilBaseStrokeEnabled: CONFIRMED value is now false version: 14
+plugin:tldraw:143587 [pencil-renderer] setPencilSampledOverlayEnabled: old= false new= true
+plugin:tldraw:143590 [pencil-renderer] setPencilSampledOverlayEnabled: CONFIRMED value is now true version: 15
