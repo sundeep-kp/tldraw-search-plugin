@@ -125,9 +125,11 @@ import {
 	setPencilOpacitySensitivity,
 	setPencilRecognitionPendingShapeIds,
 	setPencilSampledOverlayEnabled,
+	warmPencilBitmapCache,
 	activeBrushTipRef,
 	editorZoomRef,
 	editorRef,
+	type PencilBitmapWarmupProgress,
 } from 'src/tldraw/rendering/pencil-draw-shape-util'
 import {
 	applyGrainToDab,
@@ -719,6 +721,11 @@ type PencilScrubHudState = {
 	brushPx: number
 }
 
+type PencilBitmapWarmupHudState = PencilBitmapWarmupProgress & {
+	active: boolean
+	logLines: string[]
+}
+
 type UrlPasteDialogState = {
 	url: string
 	point?: VecLike
@@ -1115,6 +1122,8 @@ const TldrawApp = ({
 		top: 0,
 		brushPx: DEFAULT_PENCIL_BRUSH_PX,
 	})
+	const [pencilBitmapWarmupHud, setPencilBitmapWarmupHud] =
+		React.useState<PencilBitmapWarmupHudState | null>(null)
 	const [urlPasteDialog, setUrlPasteDialog] = React.useState<UrlPasteDialogState | null>(null)
 	const searchInputRef = React.useRef<HTMLInputElement>(null)
 	const searchPanelRef = React.useRef<HTMLDivElement>(null)
@@ -1150,6 +1159,7 @@ const TldrawApp = ({
 	const saveTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 	const cameraMotionTimerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 	const renderKickRafRef = React.useRef<number | null>(null)
+	const pencilBitmapWarmupHideTimerRef = React.useRef<number | undefined>(undefined)
 	const lastCameraMotionAtRef = React.useRef(0)
 	const isCameraMovingRef = React.useRef(false)
 	const lastCameraRef = React.useRef<{ x: number; y: number; z: number } | null>(null)
@@ -2717,10 +2727,9 @@ const TldrawApp = ({
 
 	// Force tldraw to invalidate render cache when renderer settings change
 	const invalidateDrawShapeCache = React.useCallback(() => {
-		if (editor && !isPencilRendererOwner(editor)) return
 		invalidatePencilRibbonCache()
 
-		if (!editor) return
+		if (!editor || !isPencilRendererOwner(editor)) return
 
 		// Force a lightweight editor repaint so draw-shape util mode transitions are applied
 		// immediately after moving/stable flag changes.
@@ -2738,6 +2747,92 @@ const TldrawApp = ({
 			})
 		})
 	}, [editor])
+
+	React.useEffect(() => {
+		invalidateDrawShapeCache()
+	}, [handwritingDocumentId, invalidateDrawShapeCache])
+
+	React.useEffect(() => {
+		if (!editor || !handwritingDocumentId) {
+			setPencilBitmapWarmupHud(null)
+			return
+		}
+
+		let cancelled = false
+		if (pencilBitmapWarmupHideTimerRef.current !== undefined) {
+			window.clearTimeout(pencilBitmapWarmupHideTimerRef.current)
+			pencilBitmapWarmupHideTimerRef.current = undefined
+		}
+
+		const drawShapes = editor
+			.getCurrentPageShapes()
+			.filter(
+				(shape): shape is TLDrawShape => shape.type === 'draw' && (shape as TLDrawShape).props.isComplete !== false
+			)
+
+		setPencilBitmapWarmupHud(
+			drawShapes.length > 0
+				? {
+					active: true,
+					completed: 0,
+					total: 0,
+					cached: 0,
+					message: 'Scanning pencil bitmaps…',
+					logLines: ['Scanning pencil bitmaps…'],
+					done: false,
+				}
+				: null
+		)
+
+		void warmPencilBitmapCache(editor, drawShapes, (progress) => {
+			if (cancelled) return
+			setPencilBitmapWarmupHud((current) => {
+				const nextLogLines = [...(current?.logLines ?? [])]
+				if (nextLogLines[nextLogLines.length - 1] !== progress.message) {
+					nextLogLines.push(progress.message)
+				}
+				return {
+					active: !progress.done,
+					completed: progress.completed,
+					total: progress.total,
+					cached: progress.cached,
+					message: progress.message,
+					logLines: nextLogLines.slice(-4),
+					done: progress.done,
+				}
+			})
+		}).then((progress) => {
+			if (cancelled) return
+			if (progress.total === 0) {
+				setPencilBitmapWarmupHud(null)
+				return
+			}
+			setPencilBitmapWarmupHud((current) =>
+				current
+					? {
+						...current,
+						active: false,
+						message: progress.message,
+						logLines: [...current.logLines, progress.message].slice(-4),
+						done: true,
+					}
+					: null
+			)
+			pencilBitmapWarmupHideTimerRef.current = window.setTimeout(() => {
+				if (!cancelled) {
+					setPencilBitmapWarmupHud(null)
+				}
+			}, 1200)
+		})
+
+		return () => {
+			cancelled = true
+			if (pencilBitmapWarmupHideTimerRef.current !== undefined) {
+				window.clearTimeout(pencilBitmapWarmupHideTimerRef.current)
+				pencilBitmapWarmupHideTimerRef.current = undefined
+			}
+		}
+	}, [editor, handwritingDocumentId])
 
 	const applyRendererFlags = React.useCallback(() => {
 		const effectiveDefaultStrokeEnabled = forceVisibleSelectedDrawDiagnostic
@@ -5630,6 +5725,44 @@ const TldrawApp = ({
 				</div>
 			) : null}
 			{playlistHoverPreviewOverlay}
+			{pencilBitmapWarmupHud ? (
+				<div className="ptl-pencil-cache-warmup-overlay" aria-live="polite">
+					<div className="ptl-pencil-cache-warmup-header">
+						<div className="ptl-pencil-cache-warmup-title">Pencil bitmap cache</div>
+						<div className="ptl-pencil-cache-warmup-counts">
+							{pencilBitmapWarmupHud.total > 0
+								? `${pencilBitmapWarmupHud.completed}/${pencilBitmapWarmupHud.total}`
+								: 'ready'}
+						</div>
+					</div>
+					<div className="ptl-pencil-cache-warmup-status">{pencilBitmapWarmupHud.message}</div>
+					<div className="ptl-pencil-cache-warmup-progress" aria-hidden="true">
+						<div
+							className={`ptl-pencil-cache-warmup-progress-fill${
+								pencilBitmapWarmupHud.active ? ' is-animating' : ''
+							}`}
+							style={{
+								width:
+									pencilBitmapWarmupHud.total > 0
+										? `${Math.min(
+											100,
+											Math.round((pencilBitmapWarmupHud.completed / pencilBitmapWarmupHud.total) * 100)
+										)}%`
+										: pencilBitmapWarmupHud.active
+											? '100%'
+											: '100%',
+							}}
+						/>
+					</div>
+					<div className="ptl-pencil-cache-warmup-log">
+						{pencilBitmapWarmupHud.logLines.map((line) => (
+							<div key={line} className="ptl-pencil-cache-warmup-log-line">
+								{line}
+							</div>
+						))}
+					</div>
+				</div>
+			) : null}
 			<Tldraw // This component is responsible for rendering the canvas.
 				{...storeProps}
 				assetUrls={assetUrls.current}

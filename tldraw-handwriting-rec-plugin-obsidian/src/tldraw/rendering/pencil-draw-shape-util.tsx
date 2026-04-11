@@ -116,16 +116,101 @@ export function releasePencilRendererOwner(editor: import('tldraw').Editor): voi
 type RibbonCacheEntry = {
 	key: string
 	node: React.ReactElement
+	documentId: string
+	shapeId: string
 }
 
 type RasterCacheEntry = {
 	key: string
 	node: React.ReactElement
+	documentId: string
+	shapeId: string
 }
 
 const ribbonCache = new Map<string, RibbonCacheEntry>()
 const rasterCache = new Map<string, RasterCacheEntry>()
 let ribbonRenderEpoch = 0
+
+function getCurrentPencilRendererDocumentId(): string {
+	const storeProps = editorRef.current?.store.props as
+		| { plugin?: { meta?: { uuid?: string } } }
+		| undefined
+	return storeProps?.plugin?.meta?.uuid ?? 'volatile-document'
+}
+
+function getPencilRendererCacheKey(shapeId: string): string {
+	return `${getCurrentPencilRendererDocumentId()}|${shapeId}`
+}
+
+export type PencilBitmapWarmupProgress = {
+	completed: number
+	total: number
+	cached: number
+	message: string
+	done: boolean
+}
+
+export async function warmPencilBitmapCache(
+	editor: import('tldraw').Editor,
+	shapes: TLDrawShape[],
+	onProgress?: (progress: PencilBitmapWarmupProgress) => void
+): Promise<PencilBitmapWarmupProgress> {
+	const drawShapeUtil = editor.getShapeUtil('draw') as PencilDrawShapeUtil
+	const eligibleShapes = shapes.filter(
+		(shape) => shape.type === 'draw' && !shape.props.isPen && shape.props.isComplete !== false
+	)
+	const pendingShapes = eligibleShapes.filter((shape) => {
+		const cached = rasterCache.get(getPencilRendererCacheKey(shape.id))
+		return cached === undefined
+	})
+	const cached = eligibleShapes.length - pendingShapes.length
+	const total = pendingShapes.length
+
+	if (total === 0) {
+		const progress: PencilBitmapWarmupProgress = {
+			completed: 0,
+			total: 0,
+			cached,
+			message: cached > 0 ? `Already cached ${cached} pencil bitmap${cached === 1 ? '' : 's'}.` : 'No pencil bitmaps to cache.',
+			done: true,
+		}
+		onProgress?.(progress)
+		return progress
+	}
+
+	const progressBase = {
+		total,
+		cached,
+	}
+	let completed = 0
+	const chunkSize = 12
+
+	for (let index = 0; index < pendingShapes.length; index += chunkSize) {
+		const chunk = pendingShapes.slice(index, index + chunkSize)
+		for (const shape of chunk) {
+			drawShapeUtil.component(shape)
+			completed += 1
+			onProgress?.({
+				...progressBase,
+				completed,
+				message: `Caching pencil bitmaps ${completed}/${total}`,
+				done: false,
+			})
+		}
+		if (index + chunkSize < pendingShapes.length) {
+			await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()))
+		}
+	}
+
+	const progress: PencilBitmapWarmupProgress = {
+		...progressBase,
+		completed,
+		message: `Cached ${completed} pencil bitmap${completed === 1 ? '' : 's'} for this file.`,
+		done: true,
+	}
+	onProgress?.(progress)
+	return progress
+}
 
 export function invalidatePencilRibbonCache(): void {
 	ribbonRenderEpoch = (ribbonRenderEpoch + 1) >>> 0
@@ -137,10 +222,12 @@ function evictRibbonCache(): void {
 	if (ribbonCache.size <= 400) return
 
 	const editor = editorRef.current
+	const activeDocumentId = getCurrentPencilRendererDocumentId()
 	if (editor) {
-		for (const id of Array.from(ribbonCache.keys())) {
-			if (!editor.getShape(id as TLShapeId)) {
-				ribbonCache.delete(id)
+		for (const [cacheKey, entry] of Array.from(ribbonCache.entries())) {
+			if (entry.documentId !== activeDocumentId) continue
+			if (!editor.getShape(entry.shapeId as TLShapeId)) {
+				ribbonCache.delete(cacheKey)
 			}
 		}
 	}
@@ -159,7 +246,13 @@ function rememberRibbonNode(
 	cacheKey: string,
 	node: React.ReactElement
 ): React.ReactElement {
-	ribbonCache.set(shapeId, { key: cacheKey, node })
+	const documentId = getCurrentPencilRendererDocumentId()
+	ribbonCache.set(getPencilRendererCacheKey(shapeId), {
+		key: cacheKey,
+		node,
+		documentId,
+		shapeId,
+	})
 	evictRibbonCache()
 	return node
 }
@@ -169,7 +262,13 @@ function rememberRasterNode(
 	cacheKey: string,
 	node: React.ReactElement
 ): React.ReactElement {
-	rasterCache.set(shapeId, { key: cacheKey, node })
+	const documentId = getCurrentPencilRendererDocumentId()
+	rasterCache.set(getPencilRendererCacheKey(shapeId), {
+		key: cacheKey,
+		node,
+		documentId,
+		shapeId,
+	})
 	if (rasterCache.size > 220) {
 		let removed = 0
 		for (const key of rasterCache.keys()) {
@@ -427,7 +526,9 @@ function buildPressureSampledRibbonStroke(
 	const motionToken = 'stable'
 	const brushBitmap = activeBrushTipRef.current
 	const brushToken = brushBitmap ? `bitmap:${brushBitmap.width}x${brushBitmap.height}` : 'nobmp'
+	const documentToken = getCurrentPencilRendererDocumentId()
 	const cacheKey = [
+		documentToken,
 		shape.id,
 		ribbonRenderEpoch,
 		localPressurePoints.length,
@@ -443,7 +544,7 @@ function buildPressureSampledRibbonStroke(
 		shape.props.size,
 		shape.props.scale?.toFixed(2) ?? '1',
 	].join('|')
-	const cached = ribbonCache.get(shape.id)
+	const cached = ribbonCache.get(getPencilRendererCacheKey(shape.id))
 	const cacheValid = cached?.key === cacheKey
 
 	if (cacheValid) {
@@ -637,6 +738,7 @@ function buildPressureBitmapStroke(
 		geoHash = (geoHash * 31 + ((p.pressure * 1000) | 0)) & 0xffffffff
 	}
 	const cacheKey = [
+		getCurrentPencilRendererDocumentId(),
 		shape.id,
 		ribbonRenderEpoch,
 		localPressurePoints.length,
@@ -648,7 +750,7 @@ function buildPressureBitmapStroke(
 		pixelWidth,
 		pixelHeight,
 	].join('|')
-	const cached = rasterCache.get(shape.id)
+	const cached = rasterCache.get(getPencilRendererCacheKey(shape.id))
 	if (cached?.key === cacheKey) return cached.node
 
 	const canvas = document.createElement('canvas')
@@ -1198,7 +1300,7 @@ function isRecognitionStillPending(shape: TLDrawShape): boolean {
 export class PencilDrawShapeUtil extends DrawShapeUtil {
 	override component(shape: TLDrawShape) {
 		if (!isShapeNearViewport(shape)) {
-			const stale = ribbonCache.get(shape.id)
+			const stale = ribbonCache.get(getPencilRendererCacheKey(shape.id))
 			if (stale) return ensureElement(wrapForHtmlRender(stale.node))
 			return ensureElement(super.component(shape))
 		}
