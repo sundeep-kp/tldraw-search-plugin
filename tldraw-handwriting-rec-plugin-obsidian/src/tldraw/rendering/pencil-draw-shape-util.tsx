@@ -33,6 +33,13 @@ export const cameraMovingRef: React.MutableRefObject<boolean> = { current: false
  */
 export const editorZoomRef: React.MutableRefObject<number> = { current: 1 }
 export const editorRef: React.MutableRefObject<import('tldraw').Editor | null> = { current: null }
+const recognitionPendingShapeIdsRef: React.MutableRefObject<Set<string>> = {
+	current: new Set<string>(),
+}
+
+export function setPencilRecognitionPendingShapeIds(shapeIds: Iterable<string>): void {
+	recognitionPendingShapeIdsRef.current = new Set(shapeIds)
+}
 
 /**
  * Module-level references for renderer configuration flags.
@@ -1176,6 +1183,10 @@ function buildRealtimePressureOverlay(shape: TLDrawShape, color: string, baseWid
 	return circles.length ? React.createElement('g', null, ...circles) : null
 }
 
+function isRecognitionStillPending(shape: TLDrawShape): boolean {
+	return recognitionPendingShapeIdsRef.current.has(shape.id)
+}
+
 /**
  * Pencil draw shape util that keeps the built-in draw geometry/rendering, but
  * applies a grain filter and pressure-based opacity when the pencil tool has
@@ -1191,8 +1202,9 @@ export class PencilDrawShapeUtil extends DrawShapeUtil {
 
 		const element = super.component(shape)
 		const isStrokeInProgress = shape.props.isComplete === false
+		const shouldUsePerformancePath = !isStrokeInProgress && !isRecognitionStillPending(shape)
 
-		if (!isStrokeInProgress) {
+		if (shouldUsePerformancePath) {
 			const bitmapStroke = buildPressureBitmapStroke(shape, element)
 			if (bitmapStroke) {
 				return ensureElement(wrapForHtmlRender(bitmapStroke))

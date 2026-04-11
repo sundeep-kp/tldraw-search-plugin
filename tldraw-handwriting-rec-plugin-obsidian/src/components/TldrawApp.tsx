@@ -123,6 +123,7 @@ import {
 	setPencilFallbackStylingEnabled,
 	setPencilCrossSectionAspectRatio,
 	setPencilOpacitySensitivity,
+	setPencilRecognitionPendingShapeIds,
 	setPencilSampledOverlayEnabled,
 	activeBrushTipRef,
 	editorZoomRef,
@@ -1115,8 +1116,9 @@ const TldrawApp = ({
 	const committedCanvasRef = React.useRef<HTMLCanvasElement | null>(null)
 	const activeCanvasRef = React.useRef<HTMLCanvasElement | null>(null)
 	const previousNormalizedSearchQueryRef = React.useRef('')
-	const recognizerRef = React.useRef(createHandwritingRecognizer({ engine: 'stub' }))
+	const recognizerRef = React.useRef(createHandwritingRecognizer({ engine: 'google-ime-js' }))
 	const recognitionDebounceTimerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+	const performanceGateSyncTimerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 	const recognitionRunVersionRef = React.useRef(0)
 	const brushTipCache = React.useRef<Map<string, ImageBitmap>>(new Map())
 	const activeBrushTip = React.useRef<ImageBitmap | null>(null)
@@ -3081,7 +3083,7 @@ const TldrawApp = ({
 		const preferred = userSettings.handwritingRecognition?.backend ?? 'auto'
 		if (preferred === 'google-ime-js') return 'google-ime-js'
 		if (preferred === 'onnx-web') return 'onnx-web'
-		return isOnlineHtrModelConfigReady(onnxModelConfig) ? 'onnx-web' : 'stub'
+		return isOnlineHtrModelConfigReady(onnxModelConfig) ? 'onnx-web' : 'google-ime-js'
 	}, [onnxModelConfig, userSettings.handwritingRecognition?.backend])
 
 	const loadModelBytes = React.useCallback(
@@ -3202,7 +3204,9 @@ const TldrawApp = ({
 
 	const buildRecognitionCandidates = React.useCallback(
 		(payloads: ReturnType<typeof getAllNormalizedStrokePayloads>) => {
-			const manualMode = !!userSettings.handwritingRecognition?.manualPredictButton
+			// Manual predict UI button was removed, so keep recognition in auto mode
+			// to avoid silently stalling recognition when this setting is enabled.
+			const manualMode = false
 			const groupedCandidates = manualMode
 				? buildManualMergedCandidate(payloads)
 				: userSettings.handwritingRecognition?.singleShapeMode
@@ -3242,6 +3246,34 @@ const TldrawApp = ({
 			userSettings.handwritingRecognition?.manualPredictButton,
 			userSettings.handwritingRecognition?.singleShapeMode,
 		]
+	)
+
+	const syncPerformancePathAfterRecognition = React.useCallback(
+		(delayMs = 220) => {
+			if (performanceGateSyncTimerRef.current) {
+				clearTimeout(performanceGateSyncTimerRef.current)
+			}
+
+			performanceGateSyncTimerRef.current = setTimeout(() => {
+				const pendingShapeIds = new Set<string>()
+				const candidateResultsByGroupId = new Map(
+					getDocumentRecognitionResults(handwritingDocumentId).map((result) => [result.groupId, result])
+				)
+				const groupedCandidates = getDocumentWordCandidates(handwritingDocumentId)
+
+				for (const candidate of groupedCandidates) {
+					const result = candidateResultsByGroupId.get(candidate.id)
+					if (!result || result.status === 'pending') {
+						for (const shapeId of candidate.shapeIds) {
+							pendingShapeIds.add(shapeId)
+						}
+					}
+				}
+
+				setPencilRecognitionPendingShapeIds(pendingShapeIds)
+			}, Math.max(0, delayMs))
+		},
+		[handwritingDocumentId]
 	)
 
 	const scheduleRecognition = React.useCallback(
@@ -3303,6 +3335,7 @@ const TldrawApp = ({
 							updatedAt: Date.now(),
 							candidates: [],
 						})
+						syncPerformancePathAfterRecognition()
 						setOverlayRenderTick((tick) => tick + 1)
 
 						try {
@@ -3320,6 +3353,7 @@ const TldrawApp = ({
 								updatedAt: Date.now(),
 								candidates: recognitionCandidates,
 							})
+							syncPerformancePathAfterRecognition()
 							setOverlayRenderTick((tick) => tick + 1)
 
 							recognizedCount += 1
@@ -3334,9 +3368,12 @@ const TldrawApp = ({
 								candidates: [],
 								error: error instanceof Error ? error.message : String(error),
 							})
+							syncPerformancePathAfterRecognition()
 							setOverlayRenderTick((tick) => tick + 1)
 						}
 					}
+
+					syncPerformancePathAfterRecognition()
 
 					if (
 						deferredCount > 0 &&
@@ -3357,9 +3394,19 @@ const TldrawApp = ({
 			buildGroupFingerprint,
 			handwritingDocumentId,
 			recognitionDebounceMs,
+			syncPerformancePathAfterRecognition,
 			userSettings.debugMode,
 		]
 	)
+
+	React.useEffect(() => {
+		syncPerformancePathAfterRecognition(0)
+		return () => {
+			if (performanceGateSyncTimerRef.current) {
+				clearTimeout(performanceGateSyncTimerRef.current)
+			}
+		}
+	}, [syncPerformancePathAfterRecognition])
 
 	React.useEffect(() => {
 		if (!editor) return
@@ -3425,6 +3472,7 @@ const TldrawApp = ({
 
 		setDocumentWordCandidates(handwritingDocumentId, backfillCandidates)
 		scheduleRecognition(backfillCandidates, { immediate: true })
+		syncPerformancePathAfterRecognition()
 		setOverlayRenderTick((tick) => tick + 1)
 		bootstrappedRecognitionByDocumentRef.current.add(handwritingDocumentId)
 
@@ -3445,6 +3493,7 @@ const TldrawApp = ({
 		googleBatchPolicy,
 		handwritingDocumentId,
 		recognizerEngine,
+		syncPerformancePathAfterRecognition,
 		scheduleRecognition,
 		userSettings.debugMode,
 		userSettings.handwritingRecognition?.manualPredictButton,
@@ -4343,6 +4392,7 @@ const TldrawApp = ({
 				buildRecognitionCandidates(payloads)
 
 			setDocumentWordCandidates(handwritingDocumentId, recognitionCandidates)
+			syncPerformancePathAfterRecognition()
 			if (!manualMode) {
 				scheduleRecognition(recognitionCandidates)
 			}
@@ -4384,6 +4434,7 @@ const TldrawApp = ({
 			editor,
 			buildRecognitionCandidates,
 			handwritingDocumentId,
+			syncPerformancePathAfterRecognition,
 			scheduleRecognition,
 			userSettings.debugMode,
 		]
@@ -4401,6 +4452,7 @@ const TldrawApp = ({
 			const payloads = getAllNormalizedStrokePayloads(handwritingDocumentId)
 			const { manualMode, recognitionCandidates } = buildRecognitionCandidates(payloads)
 			setDocumentWordCandidates(handwritingDocumentId, recognitionCandidates)
+			syncPerformancePathAfterRecognition()
 
 			const nextCandidateIds = new Set(recognitionCandidates.map((candidate) => candidate.id))
 			for (const result of getDocumentRecognitionResults(handwritingDocumentId)) {
@@ -4435,6 +4487,7 @@ const TldrawApp = ({
 			clearCommittedCanvas,
 			handwritingDocumentId,
 			removeCurrentSidecarFiles,
+			syncPerformancePathAfterRecognition,
 			scheduleRecognition,
 			userSettings.debugMode,
 		]
@@ -4670,6 +4723,7 @@ const TldrawApp = ({
 			const payloads = getAllNormalizedStrokePayloads(handwritingDocumentId)
 			const { manualMode, recognitionCandidates } = buildRecognitionCandidates(payloads)
 			setDocumentWordCandidates(handwritingDocumentId, recognitionCandidates)
+			syncPerformancePathAfterRecognition()
 
 			const nextCandidateIds = new Set(recognitionCandidates.map((candidate) => candidate.id))
 			for (const result of getDocumentRecognitionResults(handwritingDocumentId)) {
@@ -4698,6 +4752,7 @@ const TldrawApp = ({
 			buildRecognitionCandidates,
 			editor,
 			handwritingDocumentId,
+			syncPerformancePathAfterRecognition,
 			scheduleRecognition,
 			userSettings.debugMode,
 		]
