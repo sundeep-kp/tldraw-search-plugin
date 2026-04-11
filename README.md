@@ -1,5 +1,44 @@
 [Here's the plan](plan/plan.md)
 
+
+so far i have implemented --
+1. handwriting recog. and search
+2. good enough pencil texture (resolved:*although there are performance issues*). working on custom brush stamps
+3. ability to paste ANY link as resizable iframe, ability to pin(say a youtube video) to your screen (canvas moves but the video floats in place)
+4. special feature for youtube playlists -- once you paste a youtube playlist , all of its videos are listed in a menu(with there names and links , their thumbnails and full titles are previewed on hover) where you can flip through the videos or search for a video in the playlist
+5. better dark mode
+6. alt + drag to set custom brush size like in krita 
+7. added performance monitor on the top (FPS and latency)
+8. added ability to wiki link other files within the canvas using a keyboard shortcut. ability to convert a handwritten text into a wikilink to a file
+
+
+
+
+
+stuff that i request other people to fix: 
+1.the debug settings in the startup tab doesn't work well.
+2.add support for mathemical symbols
+
+
+features to add further-- 1.in the anchor links, if you right click an anchor link , you should be able to open a file inside the canvas , e.g a markdown file or even a canvas inside a canvas
+
+2.gestures for shapes like in procreate
+
+3.a birdeye map of the project like in fps games, you can place flags that appear in the map
+
+4. ui changes to make almost everything collapsable to declutter the space
+
+5. find and replace, similar to vscode (use tldraw inbuilt font , and instead of deleting the word, just add the new replacement glowing red on top with a offset, use bounding box to determine font size)
+
+6. ability to link frames(right click selection) with lines(snap to frames) , the connection points stay attached to the frame even when moving them around(like in affine)
+issues:
+
+the ctrl + F works weird, as soon as you press ctrl + f you can immediately transported to a place even without clicking anything
+
+the pencil isn't able to change color
+7.if you draw fast, the stamp density decreases
+
+
 *REPO MAP*
 
 ```
