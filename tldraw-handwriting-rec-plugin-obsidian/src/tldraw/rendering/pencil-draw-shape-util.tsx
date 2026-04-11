@@ -111,12 +111,19 @@ type RibbonCacheEntry = {
 	node: React.ReactElement
 }
 
+type RasterCacheEntry = {
+	key: string
+	node: React.ReactElement
+}
+
 const ribbonCache = new Map<string, RibbonCacheEntry>()
+const rasterCache = new Map<string, RasterCacheEntry>()
 let ribbonRenderEpoch = 0
 
 export function invalidatePencilRibbonCache(): void {
 	ribbonRenderEpoch = (ribbonRenderEpoch + 1) >>> 0
 	ribbonCache.clear()
+	rasterCache.clear()
 }
 
 function evictRibbonCache(): void {
@@ -147,6 +154,22 @@ function rememberRibbonNode(
 ): React.ReactElement {
 	ribbonCache.set(shapeId, { key: cacheKey, node })
 	evictRibbonCache()
+	return node
+}
+
+function rememberRasterNode(
+	shapeId: string,
+	cacheKey: string,
+	node: React.ReactElement
+): React.ReactElement {
+	rasterCache.set(shapeId, { key: cacheKey, node })
+	if (rasterCache.size > 220) {
+		let removed = 0
+		for (const key of rasterCache.keys()) {
+			rasterCache.delete(key)
+			if (++removed >= 40) break
+		}
+	}
 	return node
 }
 
@@ -555,6 +578,133 @@ function buildPressureSampledRibbonStroke(
 	return rememberRibbonNode(shape.id, cacheKey, result)
 }
 
+function buildPressureBitmapStroke(
+	shape: TLDrawShape,
+	baseElement: React.ReactNode
+): React.ReactElement | null {
+	const localPressurePoints = getLocalPressurePointsFromShape(shape)
+	if (localPressurePoints.length < 2) return null
+
+	const basePath = findFirstPathElement(baseElement)
+	const strokeColor =
+		basePath && typeof basePath.props.stroke === 'string'
+			? basePath.props.stroke
+			: basePath && typeof basePath.props.fill === 'string' && basePath.props.fill !== 'none'
+				? basePath.props.fill
+				: '#000000'
+	const strokeWidth =
+		basePath && typeof basePath.props.strokeWidth === 'number'
+			? basePath.props.strokeWidth
+			: ((STROKE_SIZE_BY_STYLE[shape.props.size] ?? STROKE_SIZE_BY_STYLE.m) + 1) * shape.props.scale
+
+	let minX = Number.POSITIVE_INFINITY
+	let minY = Number.POSITIVE_INFINITY
+	let maxX = Number.NEGATIVE_INFINITY
+	let maxY = Number.NEGATIVE_INFINITY
+	for (const point of localPressurePoints) {
+		if (point.x < minX) minX = point.x
+		if (point.y < minY) minY = point.y
+		if (point.x > maxX) maxX = point.x
+		if (point.y > maxY) maxY = point.y
+	}
+	if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+		return null
+	}
+
+	const padding = Math.max(8, strokeWidth * 3)
+	const scale = 2
+	const drawWidth = maxX - minX
+	const drawHeight = maxY - minY
+	const pixelWidth = Math.max(2, Math.ceil((drawWidth + padding * 2) * scale))
+	const pixelHeight = Math.max(2, Math.ceil((drawHeight + padding * 2) * scale))
+	if (pixelWidth > 4096 || pixelHeight > 4096) return null
+
+	const stride = Math.max(1, Math.floor(localPressurePoints.length / 64))
+	let geoHash = 0
+	for (let i = 0; i < localPressurePoints.length; i += stride) {
+		const p = localPressurePoints[i]
+		geoHash = (geoHash * 31 + ((p.x * 1000) | 0)) & 0xffffffff
+		geoHash = (geoHash * 31 + ((p.y * 1000) | 0)) & 0xffffffff
+		geoHash = (geoHash * 31 + ((p.pressure * 1000) | 0)) & 0xffffffff
+	}
+	const cacheKey = [
+		shape.id,
+		ribbonRenderEpoch,
+		localPressurePoints.length,
+		geoHash,
+		strokeColor,
+		strokeWidth.toFixed(3),
+		pencilOpacitySensitivity.toFixed(2),
+		shape.props.scale?.toFixed(2) ?? '1',
+		pixelWidth,
+		pixelHeight,
+	].join('|')
+	const cached = rasterCache.get(shape.id)
+	if (cached?.key === cacheKey) return cached.node
+
+	const canvas = document.createElement('canvas')
+	canvas.width = pixelWidth
+	canvas.height = pixelHeight
+	const ctx = canvas.getContext('2d')
+	if (!ctx) return null
+
+	ctx.setTransform(scale, 0, 0, scale, 0, 0)
+	ctx.translate(-(minX - padding), -(minY - padding))
+	ctx.fillStyle = strokeColor
+
+	const maxSampleLength = Math.max(3.2, strokeWidth * 1.65)
+	const opacityFloor = 0.065
+	const opacityCeiling = 0.46
+	const opacityScale = 0.56
+
+	for (let i = 0; i < localPressurePoints.length - 1; i++) {
+		const p1 = localPressurePoints[i]
+		const p2 = localPressurePoints[i + 1]
+		if (p1.x === p2.x && p1.y === p2.y) continue
+
+		const segmentLength = distanceBetweenPoints(p1, p2)
+		const sampleCount = Math.max(1, Math.ceil(segmentLength / maxSampleLength))
+		const sampleStride = getZoomAwareStride(sampleCount)
+
+		for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex += sampleStride) {
+			const startT = sampleIndex / sampleCount
+			const endT = Math.min(1, (sampleIndex + sampleStride) / sampleCount)
+			const startPoint = interpolatePressurePoint(p1, p2, startT)
+			const endPoint = interpolatePressurePoint(p1, p2, endT)
+			const centerX = (startPoint.x + endPoint.x) / 2
+			const centerY = (startPoint.y + endPoint.y) / 2
+			const startOpacity = getPressureOpacityForPoint(startPoint.pressure)
+			const endOpacity = getPressureOpacityForPoint(endPoint.pressure)
+			const averagePressure = (startPoint.pressure + endPoint.pressure) / 2
+			const averageOpacity = (startOpacity + endOpacity) / 2
+			const sampledSize = strokeWidth * lerp(0.78, 1.02, averagePressure)
+			const baseRadius = Math.max(0.2, sampledSize / 2)
+			ctx.globalAlpha = Math.max(
+				opacityFloor,
+				Math.min(opacityCeiling, averageOpacity * opacityScale)
+			)
+			ctx.beginPath()
+			ctx.arc(centerX, centerY, baseRadius, 0, Math.PI * 2)
+			ctx.fill()
+		}
+	}
+
+	const dataUrl = canvas.toDataURL('image/png')
+	const node = (
+		<image
+			href={dataUrl}
+			x={minX - padding}
+			y={minY - padding}
+			width={pixelWidth / scale}
+			height={pixelHeight / scale}
+			preserveAspectRatio="none"
+			pointerEvents="none"
+		/>
+	)
+
+	return rememberRasterNode(shape.id, cacheKey, node)
+}
+
 /**
  * Calculate stride multiplier based on zoom level for low-zoom cheap mode.
  * At very low zoom, we skip more samples to reduce render load.
@@ -915,7 +1065,7 @@ function buildPressureGradientOverlay(
 			: ((STROKE_SIZE_BY_STYLE[shape.props.size] ?? STROKE_SIZE_BY_STYLE.m) + 1) * shape.props.scale
 	if (!strokeOrFillColor) return null
 
-	const bucketCount = 18
+	const bucketCount = 8
 	const buckets = buildOpacityBuckets(bucketCount)
 
 	for (let i = 0; i < localPressurePoints.length - 1; i++) {
@@ -1040,6 +1190,15 @@ export class PencilDrawShapeUtil extends DrawShapeUtil {
 		}
 
 		const element = super.component(shape)
+		const isStrokeInProgress = shape.props.isComplete === false
+
+		if (!isStrokeInProgress) {
+			const bitmapStroke = buildPressureBitmapStroke(shape, element)
+			if (bitmapStroke) {
+				return ensureElement(wrapForHtmlRender(bitmapStroke))
+			}
+		}
+
 		const ribbonStroke = pencilSampledOverlayEnabledRef.current
 			? buildPressureSampledRibbonStroke(shape, element)
 			: null
@@ -1061,6 +1220,15 @@ export class PencilDrawShapeUtil extends DrawShapeUtil {
 
 	override toSvg(shape: TLDrawShape, ctx: SvgExportContext) {
 		const element = super.toSvg(shape, ctx)
+		const isStrokeInProgress = shape.props.isComplete === false
+
+		if (!isStrokeInProgress) {
+			const settledStroke = buildPressureGradientOverlay(shape, element)
+			if (settledStroke) {
+				return ensureElement(settledStroke)
+			}
+		}
+
 		const ribbonStroke = pencilSampledOverlayEnabledRef.current
 			? buildPressureSampledRibbonStroke(shape, element)
 			: null
