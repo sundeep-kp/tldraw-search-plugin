@@ -395,6 +395,7 @@ function buildPressureSampledRibbonStroke(
 	shape: TLDrawShape,
 	baseElement: React.ReactNode
 ): React.ReactElement | null {
+	if (shape.props.isPen) return null
 	const localPressurePoints = getLocalPressurePointsFromShape(shape)
 	if (localPressurePoints.length < 2) return null
 
@@ -589,6 +590,7 @@ function buildPressureBitmapStroke(
 	shape: TLDrawShape,
 	baseElement: React.ReactNode
 ): React.ReactElement | null {
+	if (shape.props.isPen) return null
 	const localPressurePoints = getLocalPressurePointsFromShape(shape)
 	if (localPressurePoints.length < 2) return null
 
@@ -1054,6 +1056,7 @@ function buildPressureGradientOverlay(
 	shape: TLDrawShape,
 	baseElement: React.ReactNode
 ) {
+	if (shape.props.isPen) return null
 	let localPressurePoints = getLocalPressurePointsFromShape(shape)
 	if (localPressurePoints.length < 2) return null
 
@@ -1201,6 +1204,7 @@ export class PencilDrawShapeUtil extends DrawShapeUtil {
 		}
 
 		const element = super.component(shape)
+		if (shape.props.isPen) return ensureElement(element)
 		const isStrokeInProgress = shape.props.isComplete === false
 		const shouldUsePerformancePath = !isStrokeInProgress && !isRecognitionStillPending(shape)
 
@@ -1232,6 +1236,7 @@ export class PencilDrawShapeUtil extends DrawShapeUtil {
 
 	override toSvg(shape: TLDrawShape, ctx: SvgExportContext) {
 		const element = super.toSvg(shape, ctx)
+		if (shape.props.isPen) return ensureElement(element)
 		const isStrokeInProgress = shape.props.isComplete === false
 
 		if (!isStrokeInProgress) {

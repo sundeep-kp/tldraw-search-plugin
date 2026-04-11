@@ -650,6 +650,7 @@
 	text-shadow: 0 0 8px color-mix(in srgb, var(--interactive-accent) 20%, transparent);
 }
 
+/* KRITA FEATURE DISABLED
 .tldraw-view-root .ptl-krita-brush-panel {
 	margin: 8px 0;
 	padding: 8px;
@@ -750,6 +751,7 @@
 	color: var(--text-muted);
 	padding: 6px 2px;
 }
+*/
 
 .tldraw-view-root.ptl-pencil-scrubbing .tl-cursor {
 	display: none !important;

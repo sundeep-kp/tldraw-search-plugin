@@ -140,7 +140,7 @@ import {
 	extractYoutubePlaylistVideoIds,
 	getYoutubePlaylistIdFromUrl,
 } from 'src/obsidian/youtube/playlist-extractor'
-import { generateFallbackTip } from 'src/obsidian/krita/fallback-tips'
+// import { generateFallbackTip } from 'src/obsidian/krita/fallback-tips'
 import { performanceMonitor } from 'src/utilities/performance-monitor'
 
 const console = {
@@ -223,39 +223,40 @@ type BrushProfile = {
 	pencilTextureIntensity: number
 }
 
-type KritaPresetDerivedStyle = {
-	pencilBrushSizePx: number
-	pencilOpacitySensitivity: number
-	pencilTextureIntensity: number
-	pencilCrossSectionAspectRatio: number
-	pencilTextureEnabled: boolean
-	brushTipData: Uint8Array | null
-	spacingFactor: number
-	sizeCurveExponent: number
-	opacityCurveExponent: number
-	rotationJitter: number
-}
-
-type KritaBrushRuntimeContextValue = {
-	brushTipCache: React.RefObject<Map<string, ImageBitmap>>
-	activeBrushTip: React.RefObject<ImageBitmap | null>
-	activeBrushProfile: React.RefObject<BrushProfile | null>
-	activeStampShapeMode: React.RefObject<'auto' | 'circle' | 'rectangle'>
-	selectedPresetId: string | null
-	customStampPreset: { id: string; label: string } | null
-	committedCanvasRef: React.RefObject<HTMLCanvasElement | null>
-	activeCanvasRef: React.RefObject<HTMLCanvasElement | null>
-	applyPresetSelection: (
-		presetId: string,
-		presetName: string,
-		derivedStyle: KritaPresetDerivedStyle
-	) => void
-	activateCustomStamp: () => void
-	setStampShapeMode: (mode: 'auto' | 'circle' | 'rectangle') => void
-	captureSelectedShapeAsStamp: () => void
-}
-
-const KritaBrushRuntimeContext = React.createContext<KritaBrushRuntimeContextValue | null>(null)
+// KRITA FEATURE DISABLED
+// type KritaPresetDerivedStyle = {
+// 	pencilBrushSizePx: number
+// 	pencilOpacitySensitivity: number
+// 	pencilTextureIntensity: number
+// 	pencilCrossSectionAspectRatio: number
+// 	pencilTextureEnabled: boolean
+// 	brushTipData: Uint8Array | null
+// 	spacingFactor: number
+// 	sizeCurveExponent: number
+// 	opacityCurveExponent: number
+// 	rotationJitter: number
+// }
+//
+// type KritaBrushRuntimeContextValue = {
+// 	brushTipCache: React.RefObject<Map<string, ImageBitmap>>
+// 	activeBrushTip: React.RefObject<ImageBitmap | null>
+// 	activeBrushProfile: React.RefObject<BrushProfile | null>
+// 	activeStampShapeMode: React.RefObject<'auto' | 'circle' | 'rectangle'>
+// 	selectedPresetId: string | null
+// 	customStampPreset: { id: string; label: string } | null
+// 	committedCanvasRef: React.RefObject<HTMLCanvasElement | null>
+// 	activeCanvasRef: React.RefObject<HTMLCanvasElement | null>
+// 	applyPresetSelection: (
+// 		presetId: string,
+// 		presetName: string,
+// 		derivedStyle: KritaPresetDerivedStyle
+// 	) => void
+// 	activateCustomStamp: () => void
+// 	setStampShapeMode: (mode: 'auto' | 'circle' | 'rectangle') => void
+// 	captureSelectedShapeAsStamp: () => void
+// }
+//
+// const KritaBrushRuntimeContext = React.createContext<KritaBrushRuntimeContextValue | null>(null)
 
 // https://github.com/tldraw/tldraw/blob/58890dcfce698802f745253ca42584731d126cc3/apps/examples/src/examples/custom-main-menu/CustomMainMenuExample.tsx
 const components = (_plugin: TldrawPlugin): TLComponents => ({
@@ -341,50 +342,51 @@ function hashStringToUnit(value: string): number {
 	return Math.abs(hash % 1000) / 1000
 }
 
-function deriveKritaPresetStyle(presetName: string, presetPath: string) {
-	const identity = `${presetName}::${presetPath}`.toLowerCase()
-	const seed = hashStringToUnit(identity)
-
-	let pencilBrushSizePx = Math.round(8 + seed * 38)
-	let pencilOpacitySensitivity = +(0.65 + seed * 2.2).toFixed(2)
-	let pencilTextureIntensity = +(0.08 + seed * 0.72).toFixed(2)
-	let pencilCrossSectionAspectRatio = +(1 + seed * 5.5).toFixed(2)
-
-	if (/(charcoal|graphite|pencil|chalk|conte|pastel)/i.test(identity)) {
-		pencilBrushSizePx = 20 + Math.round(seed * 20)
-		pencilOpacitySensitivity = +(0.9 + seed * 1.2).toFixed(2)
-		pencilTextureIntensity = +(0.45 + seed * 0.45).toFixed(2)
-		pencilCrossSectionAspectRatio = +(3.5 + seed * 3.5).toFixed(2)
-	} else if (/(ink|pen|liner|fineliner|calligraphy)/i.test(identity)) {
-		pencilBrushSizePx = 4 + Math.round(seed * 8)
-		pencilOpacitySensitivity = +(1.8 + seed * 2.1).toFixed(2)
-		pencilTextureIntensity = +(0.03 + seed * 0.2).toFixed(2)
-		pencilCrossSectionAspectRatio = +(1 + seed * 1.5).toFixed(2)
-	} else if (/(marker|felt|highlighter)/i.test(identity)) {
-		pencilBrushSizePx = 16 + Math.round(seed * 26)
-		pencilOpacitySensitivity = +(1.4 + seed * 1.1).toFixed(2)
-		pencilTextureIntensity = +(0.05 + seed * 0.2).toFixed(2)
-		pencilCrossSectionAspectRatio = +(2 + seed * 2.5).toFixed(2)
-	} else if (/(brush|paint|watercolor|gouache|acrylic|oil)/i.test(identity)) {
-		pencilBrushSizePx = 14 + Math.round(seed * 34)
-		pencilOpacitySensitivity = +(0.85 + seed * 1.7).toFixed(2)
-		pencilTextureIntensity = +(0.2 + seed * 0.55).toFixed(2)
-		pencilCrossSectionAspectRatio = +(1.4 + seed * 2.4).toFixed(2)
-	}
-
-	return {
-		pencilBrushSizePx: clampBrushPx(pencilBrushSizePx),
-		pencilOpacitySensitivity: Math.max(0, pencilOpacitySensitivity),
-		pencilTextureIntensity: Math.max(0, Math.min(1, pencilTextureIntensity)),
-		pencilCrossSectionAspectRatio: Math.max(1, Math.min(12, pencilCrossSectionAspectRatio)),
-			pencilTextureEnabled: true,
-			brushTipData: null,
-			spacingFactor: 0.2,
-			sizeCurveExponent: 0.7,
-			opacityCurveExponent: 1.2,
-			rotationJitter: 0,
-	}
-}
+// KRITA FEATURE DISABLED
+// function deriveKritaPresetStyle(presetName: string, presetPath: string) {
+// 	const identity = `${presetName}::${presetPath}`.toLowerCase()
+// 	const seed = hashStringToUnit(identity)
+//
+// 	let pencilBrushSizePx = Math.round(8 + seed * 38)
+// 	let pencilOpacitySensitivity = +(0.65 + seed * 2.2).toFixed(2)
+// 	let pencilTextureIntensity = +(0.08 + seed * 0.72).toFixed(2)
+// 	let pencilCrossSectionAspectRatio = +(1 + seed * 5.5).toFixed(2)
+//
+// 	if (/(charcoal|graphite|pencil|chalk|conte|pastel)/i.test(identity)) {
+// 		pencilBrushSizePx = 20 + Math.round(seed * 20)
+// 		pencilOpacitySensitivity = +(0.9 + seed * 1.2).toFixed(2)
+// 		pencilTextureIntensity = +(0.45 + seed * 0.45).toFixed(2)
+// 		pencilCrossSectionAspectRatio = +(3.5 + seed * 3.5).toFixed(2)
+// 	} else if (/(ink|pen|liner|fineliner|calligraphy)/i.test(identity)) {
+// 		pencilBrushSizePx = 4 + Math.round(seed * 8)
+// 		pencilOpacitySensitivity = +(1.8 + seed * 2.1).toFixed(2)
+// 		pencilTextureIntensity = +(0.03 + seed * 0.2).toFixed(2)
+// 		pencilCrossSectionAspectRatio = +(1 + seed * 1.5).toFixed(2)
+// 	} else if (/(marker|felt|highlighter)/i.test(identity)) {
+// 		pencilBrushSizePx = 16 + Math.round(seed * 26)
+// 		pencilOpacitySensitivity = +(1.4 + seed * 1.1).toFixed(2)
+// 		pencilTextureIntensity = +(0.05 + seed * 0.2).toFixed(2)
+// 		pencilCrossSectionAspectRatio = +(2 + seed * 2.5).toFixed(2)
+// 	} else if (/(brush|paint|watercolor|gouache|acrylic|oil)/i.test(identity)) {
+// 		pencilBrushSizePx = 14 + Math.round(seed * 34)
+// 		pencilOpacitySensitivity = +(0.85 + seed * 1.7).toFixed(2)
+// 		pencilTextureIntensity = +(0.2 + seed * 0.55).toFixed(2)
+// 		pencilCrossSectionAspectRatio = +(1.4 + seed * 2.4).toFixed(2)
+// 	}
+//
+// 	return {
+// 		pencilBrushSizePx: clampBrushPx(pencilBrushSizePx),
+// 		pencilOpacitySensitivity: Math.max(0, pencilOpacitySensitivity),
+// 		pencilTextureIntensity: Math.max(0, Math.min(1, pencilTextureIntensity)),
+// 		pencilCrossSectionAspectRatio: Math.max(1, Math.min(12, pencilCrossSectionAspectRatio)),
+// 			pencilTextureEnabled: true,
+// 			brushTipData: null,
+// 			spacingFactor: 0.2,
+// 			sizeCurveExponent: 0.7,
+// 			opacityCurveExponent: 1.2,
+// 			rotationJitter: 0,
+// 	}
+// }
 
 function getPencilBrushScale(editor: Editor, brushPx: number): number {
 	const size = editor.getStyleForNextShape(DefaultSizeStyle)
@@ -459,16 +461,19 @@ function PencilBrushSizeSlider() {
 	)
 }
 
-type KritaPresetOption = {
-	id: string
-	label: string
-	bundleName: string
-	path: string
-	derivedStyle?: KritaPresetDerivedStyle
-}
+// KRITA FEATURE DISABLED
+// type KritaPresetOption = {
+// 	id: string
+// 	label: string
+// 	bundleName: string
+// 	path: string
+// 	derivedStyle?: KritaPresetDerivedStyle
+// }
+//
+// type KritaStampShapeMode = 'auto' | 'circle' | 'rectangle'
 
-type KritaStampShapeMode = 'auto' | 'circle' | 'rectangle'
-
+// KRITA FEATURE DISABLED
+/*
 function KritaBrushPresetPanel() {
 	const plugin = useTldrawPlugin()
 	const runtime = React.useContext(KritaBrushRuntimeContext)
@@ -612,6 +617,7 @@ function KritaBrushPresetPanel() {
 		</div>
 	)
 }
+*/
 
 function CustomContextMenuContent() {
 	return (
@@ -643,7 +649,7 @@ function PluginStylePanel(props: TLUiStylePanelProps) {
 		<DefaultStylePanel isMobile={props.isMobile}>
 			<>
 				<PencilBrushSizeSlider />
-				<KritaBrushPresetPanel />
+				{/* <KritaBrushPresetPanel /> */}
 				<DefaultStylePanelContent styles={styles} />
 			</>
 		</DefaultStylePanel>
@@ -1257,32 +1263,6 @@ const TldrawApp = ({
 		resolve?.(choice)
 	}, [])
 
-	const toBrushTipBytes = React.useCallback((value: unknown): Uint8Array | null => {
-		if (!value) return null
-		if (value instanceof Uint8Array) return value
-		if (Array.isArray(value)) {
-			const valid = value.every((entry) => Number.isFinite(entry))
-			return valid ? Uint8Array.from(value as number[]) : null
-		}
-		if (ArrayBuffer.isView(value)) {
-			const view = value as ArrayBufferView
-			return new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
-		}
-		if (typeof value === 'object') {
-			const candidate = value as { [key: string]: unknown; length?: unknown }
-			if (typeof candidate.length === 'number' && Number.isFinite(candidate.length)) {
-				const entries: number[] = []
-				for (let i = 0; i < candidate.length; i++) {
-					const point = candidate[String(i)]
-					if (!Number.isFinite(point)) return null
-					entries.push(Number(point))
-				}
-				return Uint8Array.from(entries)
-			}
-		}
-		return null
-	}, [])
-
 	React.useEffect(() => {
 		const mode = userSettings.handwritingRecognition?.kritaStampShape
 		const resolvedMode = mode === 'circle' || mode === 'rectangle' ? mode : 'auto'
@@ -1315,152 +1295,10 @@ const TldrawApp = ({
 		userSettings.handwritingRecognition?.pencilTextureIntensity,
 	])
 
-	const isPngBytes = React.useCallback((bytes: Uint8Array) => {
-		return (
-			bytes.length >= 8 &&
-			bytes[0] === 0x89 &&
-			bytes[1] === 0x50 &&
-			bytes[2] === 0x4e &&
-			bytes[3] === 0x47 &&
-			bytes[4] === 0x0d &&
-			bytes[5] === 0x0a &&
-			bytes[6] === 0x1a &&
-			bytes[7] === 0x0a
-		)
-	}, [])
-
-	const applyKritaPresetSelection = React.useCallback(
-		(presetId: string, presetName: string, derivedStyle: KritaPresetDerivedStyle) => {
-			activePresetIdRef.current = presetId
-			setRuntimeSelectedPresetId(presetId)
-			const profile: BrushProfile = {
-				baseSize: clampBrushPx(derivedStyle.pencilBrushSizePx),
-				spacingFactor: Math.max(0.01, derivedStyle.spacingFactor ?? 0.2),
-				sizeCurveExponent: Math.max(0.01, derivedStyle.sizeCurveExponent ?? 0.7),
-				opacityCurveExponent: Math.max(0.01, derivedStyle.opacityCurveExponent ?? 1.2),
-				rotationJitter: Math.max(0, Math.min(1, derivedStyle.rotationJitter ?? 0)),
-				baseOpacity: Math.max(0.02, Math.min(1, (derivedStyle.pencilOpacitySensitivity ?? 1) / 2.5)),
-				pencilCrossSectionAspectRatio: Math.max(1, derivedStyle.pencilCrossSectionAspectRatio ?? 5),
-				pencilTextureIntensity: Math.max(0, Math.min(1, derivedStyle.pencilTextureIntensity ?? 0.35)),
-			}
-			activeBrushProfile.current = profile
-
-			const tipBytes = toBrushTipBytes(derivedStyle.brushTipData)
-			if (!tipBytes) {
-				const fallbackKey = `fallback-${presetId}`
-				const cachedFallback = brushTipCache.current.get(fallbackKey)
-				if (cachedFallback) {
-					activeBrushTip.current = cachedFallback
-					return
-				}
-
-				activeBrushTip.current = null
-				void generateFallbackTip(presetName, profile, Math.max(48, Math.round(profile.baseSize * 2.2)))
-					.then((bitmap) => {
-						brushTipCache.current.set(fallbackKey, bitmap)
-						if (activePresetIdRef.current === presetId) {
-							activeBrushTip.current = bitmap
-						}
-					})
-					.catch((error) => {
-						console.warn('[KritaBrush] failed to generate fallback tip', {
-							presetId,
-							error,
-						})
-					})
-				return
-			}
-
-			const cached = brushTipCache.current.get(presetId)
-			if (cached) {
-				activeBrushTip.current = cached
-				return
-			}
-
-			const usePngDecode = isPngBytes(tipBytes)
-			if (!usePngDecode) {
-				// Many Krita bundle tips are GBR/GIH blobs and cannot be decoded by createImageBitmap.
-				const fallbackKey = `fallback-${presetId}`
-				const cachedFallback = brushTipCache.current.get(fallbackKey)
-				if (cachedFallback) {
-					activeBrushTip.current = cachedFallback
-					return
-				}
-				activeBrushTip.current = null
-				void generateFallbackTip(presetName, profile, Math.max(48, Math.round(profile.baseSize * 2.2)))
-					.then((bitmap) => {
-						brushTipCache.current.set(fallbackKey, bitmap)
-						if (activePresetIdRef.current === presetId) {
-							activeBrushTip.current = bitmap
-						}
-					})
-					.catch((error) => {
-						console.warn('[KritaBrush] failed to generate fallback tip', {
-							presetId,
-							error,
-						})
-					})
-				return
-			}
-
-			const normalizedTipBytes = Uint8Array.from(tipBytes)
-			const blob = new Blob([normalizedTipBytes], { type: 'image/png' })
-			void createImageBitmap(blob)
-				.then((bitmap) => {
-					brushTipCache.current.set(presetId, bitmap)
-					if (activePresetIdRef.current === presetId) {
-						activeBrushTip.current = bitmap
-					}
-				})
-				.catch((error) => {
-					console.warn('[KritaBrush] failed to decode brush tip bitmap', {
-						presetId,
-						error,
-					})
-					const fallbackKey = `fallback-${presetId}`
-					const cachedFallback = brushTipCache.current.get(fallbackKey)
-					if (cachedFallback) {
-						activeBrushTip.current = cachedFallback
-						return
-					}
-					activeBrushTip.current = null
-					void generateFallbackTip(presetName, profile, Math.max(48, Math.round(profile.baseSize * 2.2)))
-						.then((bitmap) => {
-							brushTipCache.current.set(fallbackKey, bitmap)
-							if (activePresetIdRef.current === presetId) {
-								activeBrushTip.current = bitmap
-							}
-						})
-						.catch((fallbackError) => {
-							console.warn('[KritaBrush] failed to generate fallback tip after bitmap decode failure', {
-								presetId,
-								error: fallbackError,
-							})
-						})
-				})
-		},
-		[isPngBytes, toBrushTipBytes]
-	)
-
 	const setRuntimeStampShapeMode = React.useCallback((mode: 'auto' | 'circle' | 'rectangle') => {
 		activeStampShapeMode.current = mode
 		setActiveStampShapeModeState(mode)
 	}, [])
-
-	const activateCustomStamp = React.useCallback(() => {
-		const customStamp = runtimeCustomStampPreset
-		if (!customStamp) return
-		const stampBitmap = customStampBitmapRef.current ?? brushTipCache.current.get(customStamp.id) ?? null
-		if (!stampBitmap) {
-			new Notice('Custom stamp is no longer available. Capture a new selection.')
-			return
-		}
-
-		brushTipCache.current.set(customStamp.id, stampBitmap)
-		activeBrushTip.current = stampBitmap
-		activePresetIdRef.current = customStamp.id
-		setRuntimeSelectedPresetId(customStamp.id)
-	}, [runtimeCustomStampPreset])
 
 	const captureSelectedShapeAsStamp = React.useCallback(() => {
 		if (!editor) return
@@ -1525,8 +1363,10 @@ const TldrawApp = ({
 									fallbackCtx.clearRect(0, 0, fallbackCanvas.width, fallbackCanvas.height)
 									fallbackCtx.drawImage(image, 0, 0)
 									URL.revokeObjectURL(objectUrl)
-									createImageBitmap(fallbackCanvas).then(resolve).catch(reject)
-								} catch (error) {
+									createImageBitmap(fallbackCanvas)
+										.then((bitmap: ImageBitmap) => resolve(bitmap))
+										.catch((err: unknown) => reject(err))
+								} catch (error: unknown) {
 									URL.revokeObjectURL(objectUrl)
 									reject(error)
 								}
@@ -1589,30 +1429,6 @@ const TldrawApp = ({
 		})()
 	}, [editor, setRuntimeStampShapeMode, userSettings.handwritingRecognition])
 
-	const kritaBrushRuntimeContext = React.useMemo<KritaBrushRuntimeContextValue>(
-		() => ({
-			brushTipCache: brushTipCache as React.RefObject<Map<string, ImageBitmap>>,
-			activeBrushTip: activeBrushTip as React.RefObject<ImageBitmap | null>,
-			activeBrushProfile: activeBrushProfile as React.RefObject<BrushProfile | null>,
-			activeStampShapeMode: activeStampShapeMode as React.RefObject<'auto' | 'circle' | 'rectangle'>,
-			selectedPresetId: runtimeSelectedPresetId,
-			customStampPreset: runtimeCustomStampPreset,
-			committedCanvasRef: committedCanvasRef as React.RefObject<HTMLCanvasElement | null>,
-			activeCanvasRef: activeCanvasRef as React.RefObject<HTMLCanvasElement | null>,
-			applyPresetSelection: applyKritaPresetSelection,
-			activateCustomStamp,
-			setStampShapeMode: setRuntimeStampShapeMode,
-			captureSelectedShapeAsStamp,
-		}),
-		[
-			activateCustomStamp,
-			applyKritaPresetSelection,
-			captureSelectedShapeAsStamp,
-			runtimeCustomStampPreset,
-			runtimeSelectedPresetId,
-			setRuntimeStampShapeMode,
-		]
-	)
 
 	// Keep renderer-facing refs in sync for draw-shape stamping only for the owning editor.
 	React.useEffect(() => {
@@ -2849,82 +2665,16 @@ const TldrawApp = ({
 
 	React.useEffect(() => {
 		if (!editor) return
-		const cameraMotionHoldoffMs = 320
-
-		// New editor/document lifecycle: reset local tracking.
-		lastCameraRef.current = null
-		lastCameraMotionAtRef.current = 0
-		isCameraMovingRef.current = false
 		if (isPencilRendererOwner(editor)) {
 			cameraMovingRef.current = false
-			invalidatePencilRibbonCache()
-		}
-
-		const stopCameraMoving = () => {
-			if (!isCameraMovingRef.current) {
-				return
-			}
-			isCameraMovingRef.current = false
-			if (isPencilRendererOwner(editor)) {
-				cameraMovingRef.current = false
-				invalidatePencilRibbonCache()
-				suppressMotionMarkingRef.current = true
-				editor.updateInstanceState({ isChangingStyle: true })
-				if (renderKickRafRef.current !== null) {
-					cancelAnimationFrame(renderKickRafRef.current)
-				}
-				renderKickRafRef.current = window.requestAnimationFrame(() => {
-					editor.updateInstanceState({ isChangingStyle: false })
-					renderKickRafRef.current = null
-					// Nested RAF: release suppress only after the false call's change event has propagated
-					requestAnimationFrame(() => {
-						suppressMotionMarkingRef.current = false
-					})
-				})
-			}
-		}
-
-		const scheduleCameraStop = () => {
-			if (cameraMotionTimerRef.current !== undefined) {
-				clearTimeout(cameraMotionTimerRef.current)
-			}
-			cameraMotionTimerRef.current = setTimeout(() => {
-				cameraMotionTimerRef.current = undefined
-				stopCameraMoving()
-			}, cameraMotionHoldoffMs)
-		}
-
-		const markCameraMoving = () => {
-			if (!isPencilRendererOwner(editor)) return
-			lastCameraMotionAtRef.current = performance.now()
-			if (!isCameraMovingRef.current) {
-				isCameraMovingRef.current = true
-				cameraMovingRef.current = true
-			}
-			scheduleCameraStop()
 		}
 
 		const onEditorChange = () => {
 			if (!isPencilRendererOwner(editor)) return
 			const cam = editor.getCamera()
-			const last = lastCameraRef.current
-			
-			// Update zoom level ref for zoom-aware rendering
-			editorZoomRef.current = cam.z
-			
-			if (!last) {
-				lastCameraRef.current = { x: cam.x, y: cam.y, z: cam.z }
-				return
-			}
 
-			if (cam.x !== last.x || cam.y !== last.y || cam.z !== last.z) {
-				lastCameraRef.current = { x: cam.x, y: cam.y, z: cam.z }
-				// Only suppress if this is a self-inflicted style update (from our effect's updateInstanceState)
-				// This allows the debounce timer to properly fire and stop motion detection
-				if (!suppressMotionMarkingRef.current) {
-					markCameraMoving()
-				}
-			}
+			// Keep zoom level ref in sync for renderer math.
+			editorZoomRef.current = cam.z
 		}
 
 		onEditorChange()
@@ -2932,15 +2682,9 @@ const TldrawApp = ({
 
 		return () => {
 			editor.off('change', onEditorChange)
-			if (renderKickRafRef.current !== null) {
-				cancelAnimationFrame(renderKickRafRef.current)
-				renderKickRafRef.current = null
+			if (isPencilRendererOwner(editor)) {
+				cameraMovingRef.current = false
 			}
-			if (cameraMotionTimerRef.current !== undefined) {
-				clearTimeout(cameraMotionTimerRef.current)
-				cameraMotionTimerRef.current = undefined
-			}
-			stopCameraMoving()
 			releasePencilRendererOwner(editor)
 		}
 	}, [editor])
@@ -2996,30 +2740,22 @@ const TldrawApp = ({
 	}, [editor])
 
 	const applyRendererFlags = React.useCallback(() => {
-		const effectiveDefaultStrokeEnabled = isCameraMovingRef.current
-			? true
-			: forceVisibleSelectedDrawDiagnostic
+		const effectiveDefaultStrokeEnabled = forceVisibleSelectedDrawDiagnostic
 			? true
 			: useKritaRasterPipeline
 				? false
 				: pencilDefaultStrokeEnabled
-		const effectiveBaseStrokeEnabled = isCameraMovingRef.current
-			? true
-			: forceVisibleSelectedDrawDiagnostic
+		const effectiveBaseStrokeEnabled = forceVisibleSelectedDrawDiagnostic
 			? true
 			: useKritaRasterPipeline
 				? false
 				: pencilBaseStrokeEnabled
-		const effectiveSampledOverlayEnabled = isCameraMovingRef.current
-			? false
-			: forceVisibleSelectedDrawDiagnostic
+		const effectiveSampledOverlayEnabled = forceVisibleSelectedDrawDiagnostic
 			? false
 			: useKritaRasterPipeline
 				? true
 				: pencilSampledOverlayEnabled
-		const effectiveFallbackStylingEnabled = isCameraMovingRef.current
-			? false
-			: forceVisibleSelectedDrawDiagnostic
+		const effectiveFallbackStylingEnabled = forceVisibleSelectedDrawDiagnostic
 			? true
 			: useKritaRasterPipeline
 				? false
@@ -3256,14 +2992,17 @@ const TldrawApp = ({
 
 			performanceGateSyncTimerRef.current = setTimeout(() => {
 				const pendingShapeIds = new Set<string>()
+				const nowMs = Date.now()
+				const allResults = getDocumentRecognitionResults(handwritingDocumentId)
 				const candidateResultsByGroupId = new Map(
-					getDocumentRecognitionResults(handwritingDocumentId).map((result) => [result.groupId, result])
+					allResults.map((result) => [result.groupId, result])
 				)
 				const groupedCandidates = getDocumentWordCandidates(handwritingDocumentId)
 
 				for (const candidate of groupedCandidates) {
 					const result = candidateResultsByGroupId.get(candidate.id)
-					if (!result || result.status === 'pending') {
+					const isFreshUnstarted = !result && nowMs - candidate.endedAt < 900
+					if (result?.status === 'pending' || isFreshUnstarted) {
 						for (const shapeId of candidate.shapeIds) {
 							pendingShapeIds.add(shapeId)
 						}
@@ -3271,9 +3010,28 @@ const TldrawApp = ({
 				}
 
 				setPencilRecognitionPendingShapeIds(pendingShapeIds)
+
+				// Entity count metrics: if optimization works, count = recognized batches; else count = pending shapes
+				const successBatches = allResults.filter((r) => r.status === 'success').length
+				const pendingBatches = allResults.filter((r) => r.status === 'pending').length
+				const totalBatches = groupedCandidates.length
+				const totalEntities = successBatches // Optimized: batches as bitmaps
+				const fallbackEntities = pendingShapeIds.size // Not optimized: individual shapes still rendering as nodes
+
+				if (userSettings.debugMode) {
+					console.log('[handwriting] performance gate sync', {
+						documentId: handwritingDocumentId,
+						totalEntities,
+						fallbackEntities,
+						successBatches,
+						pendingBatches,
+						totalBatches,
+						pendingShapeIds: Array.from(pendingShapeIds),
+					})
+				}
 			}, Math.max(0, delayMs))
 		},
-		[handwritingDocumentId]
+		[handwritingDocumentId, userSettings.debugMode]
 	)
 
 	const scheduleRecognition = React.useCallback(
@@ -3293,7 +3051,7 @@ const TldrawApp = ({
 				const holdoffMs = options.immediate ? 0 : autoRecognitionHoldoffMs
 
 				void (async () => {
-					let recognizedCount = 0
+					let processedCount = 0
 					let deferredCount = 0
 					let minRemainingHoldoffMs = Number.POSITIVE_INFINITY
 
@@ -3335,7 +3093,7 @@ const TldrawApp = ({
 							updatedAt: Date.now(),
 							candidates: [],
 						})
-						syncPerformancePathAfterRecognition()
+						processedCount += 1
 						setOverlayRenderTick((tick) => tick + 1)
 
 						try {
@@ -3353,10 +3111,7 @@ const TldrawApp = ({
 								updatedAt: Date.now(),
 								candidates: recognitionCandidates,
 							})
-							syncPerformancePathAfterRecognition()
 							setOverlayRenderTick((tick) => tick + 1)
-
-							recognizedCount += 1
 						} catch (error) {
 							upsertRecognitionResult(handwritingDocumentId, {
 								groupId: candidate.id,
@@ -3368,12 +3123,13 @@ const TldrawApp = ({
 								candidates: [],
 								error: error instanceof Error ? error.message : String(error),
 							})
-							syncPerformancePathAfterRecognition()
 							setOverlayRenderTick((tick) => tick + 1)
 						}
 					}
 
-					syncPerformancePathAfterRecognition()
+					if (processedCount > 0) {
+						syncPerformancePathAfterRecognition(0)
+					}
 
 					if (
 						deferredCount > 0 &&
@@ -3472,7 +3228,6 @@ const TldrawApp = ({
 
 		setDocumentWordCandidates(handwritingDocumentId, backfillCandidates)
 		scheduleRecognition(backfillCandidates, { immediate: true })
-		syncPerformancePathAfterRecognition()
 		setOverlayRenderTick((tick) => tick + 1)
 		bootstrappedRecognitionByDocumentRef.current.add(handwritingDocumentId)
 
@@ -3493,7 +3248,6 @@ const TldrawApp = ({
 		googleBatchPolicy,
 		handwritingDocumentId,
 		recognizerEngine,
-		syncPerformancePathAfterRecognition,
 		scheduleRecognition,
 		userSettings.debugMode,
 		userSettings.handwritingRecognition?.manualPredictButton,
@@ -3582,6 +3336,21 @@ const TldrawApp = ({
 			persistBrushPx(scrubState.brushPx)
 		}
 
+		const ensureActiveShapeIsPen = () => {
+			const activeShape = drawingState.initialShape
+			if (!activeShape?.id || activeShape.type !== 'draw') return
+			editor.updateShapes([
+				{
+					id: activeShape.id,
+					type: 'draw',
+					props: {
+						...activeShape.props,
+						isPen: true,
+					},
+				},
+			])
+		}
+
 		const applyActiveBrushScale = () => {
 			const brushPx = scrubState.active
 				? scrubState.brushPx
@@ -3595,6 +3364,7 @@ const TldrawApp = ({
 						type: 'draw',
 						props: {
 							...activeShape.props,
+							isPen: false,
 							scale,
 						},
 					},
@@ -3909,6 +3679,257 @@ const TldrawApp = ({
 		userSettings.handwritingRecognition?.pencilTextureIntensity,
 	])
 
+	// Pen tool scrub state (alt+drag brush size adjustment)
+	React.useEffect(() => {
+		if (!editor) return
+
+		type PointerPointLike = {
+			x?: number
+			y?: number
+			z?: number
+		}
+
+		type PointerInfoLike = {
+			point?: PointerPointLike
+		}
+
+		type PenDrawingStateLike = {
+			onEnter?: (info: PointerInfoLike) => void
+			updateDrawingShape?: () => void
+			onPointerUp?: () => void
+			onExit?: () => void
+			parent?: {
+				transition: (state: string) => void
+			}
+			initialShape?: {
+				id: TLShapeId
+				type: 'draw'
+				props?: {
+					scale?: number
+				}
+			}
+		}
+
+		const drawingState =
+			(editor.getStateDescendant('pen.drawing') ??
+				editor.getStateDescendant('draw.drawing')) as PenDrawingStateLike | undefined
+		if (!drawingState || typeof drawingState.updateDrawingShape !== 'function') return
+
+		const originalOnEnter = drawingState.onEnter?.bind(drawingState)
+		const originalUpdateDrawingShape = drawingState.updateDrawingShape.bind(drawingState)
+		const originalOnPointerUp = drawingState.onPointerUp?.bind(drawingState)
+		const originalOnExit = drawingState.onExit?.bind(drawingState)
+
+		const scrubState = {
+			active: false,
+			suppressDrawingStart: false,
+			cancelCurrentStrokeOnExit: false,
+			anchorX: 0,
+			startBrushPx: clampBrushPx(
+				userSettings.handwritingRecognition?.pencilBrushSizePx ?? DEFAULT_PENCIL_BRUSH_PX
+			),
+			brushPx: clampBrushPx(
+				userSettings.handwritingRecognition?.pencilBrushSizePx ?? DEFAULT_PENCIL_BRUSH_PX
+			),
+		}
+
+		const persistBrushPx = (brushPx: number) => {
+			const clamped = clampBrushPx(brushPx)
+			plugin.settingsManager.settings.handwritingRecognition = {
+				...(plugin.settingsManager.settings.handwritingRecognition ?? {}),
+				pencilBrushSizePx: clamped,
+			}
+			void plugin.settingsManager.updateSettings(plugin.settingsManager.settings)
+		}
+
+		const maybeFinishScrub = () => {
+			if (!scrubState.active) return
+			scrubState.active = false
+			scrubState.suppressDrawingStart = false
+			suppressScrubArtifactUntilRef.current = Date.now() + 300
+			setPencilScrubHud((prev) => ({ ...prev, active: false }))
+			persistBrushPx(scrubState.brushPx)
+		}
+
+		const ensureActiveShapeIsPen = () => {
+			const activeShape = drawingState.initialShape
+			if (!activeShape?.id || activeShape.type !== 'draw') return
+			editor.updateShapes([
+				{
+					id: activeShape.id,
+					type: 'draw',
+					props: {
+						...activeShape.props,
+						isPen: true,
+					},
+				},
+			])
+		}
+
+		const applyActiveBrushScale = () => {
+			const brushPx = scrubState.active
+				? scrubState.brushPx
+				: clampBrushPx(userSettings.handwritingRecognition?.pencilBrushSizePx ?? DEFAULT_PENCIL_BRUSH_PX)
+			const scale = getPencilBrushScale(editor, brushPx)
+			const activeShape = drawingState.initialShape
+			if (activeShape?.id && activeShape.type === 'draw') {
+				editor.updateShapes([
+					{
+						id: activeShape.id,
+						type: 'draw',
+						props: {
+							...activeShape.props,
+							isPen: true,
+							scale,
+						},
+					},
+				])
+			}
+		}
+
+		drawingState.onEnter = (info: PointerInfoLike) => {
+			const point = info?.point
+			if (!point || typeof point.z !== 'number') {
+				originalOnEnter?.(info)
+				ensureActiveShapeIsPen()
+				applyActiveBrushScale()
+				return
+			}
+
+			const isStylusContact = point.z > 0
+			if (editor.inputs.altKey && isStylusContact) {
+				scrubState.active = true
+				scrubState.suppressDrawingStart = true
+				scrubState.anchorX = typeof point.x === 'number' ? point.x : 0
+				scrubState.startBrushPx = scrubState.brushPx
+				return
+			}
+
+			originalOnEnter?.(info)
+			ensureActiveShapeIsPen()
+			applyActiveBrushScale()
+		}
+
+		drawingState.updateDrawingShape = () => {
+			const currentPoint = editor.inputs.currentPagePoint as { x: number; y: number; z?: number }
+			const isStylusContact = typeof currentPoint?.z === 'number' && currentPoint.z > 0
+			const point = editor.inputs.currentPagePoint as { x?: number; y?: number; z?: number }
+
+			const wasActive = scrubState.active
+			if (editor.inputs.altKey && isStylusContact) {
+				if (!scrubState.active) {
+					scrubState.active = true
+					scrubState.suppressDrawingStart = !drawingState.initialShape?.id
+					scrubState.anchorX = currentPoint.x
+					scrubState.startBrushPx = scrubState.brushPx
+				}
+
+				const dx = currentPoint.x - scrubState.anchorX
+				scrubState.brushPx = clampBrushPx(
+					scrubState.startBrushPx + dx * PENCIL_SCRUB_PX_PER_SCREEN_PIXEL
+				)
+				const scrubHudPoint = editor.pageToViewport({ x: currentPoint.x, y: currentPoint.y })
+				setPencilScrubHud({
+					active: true,
+					left: scrubHudPoint.x,
+					top: scrubHudPoint.y,
+					brushPx: scrubState.brushPx,
+				})
+				applyActiveBrushScale()
+
+				if (scrubState.suppressDrawingStart) {
+					return
+				}
+
+				if (point && typeof point.z === 'number') {
+					const originalZDuringScrub = point.z
+					point.z = 0
+					try {
+						originalUpdateDrawingShape()
+					} finally {
+						point.z = originalZDuringScrub
+					}
+					return
+				}
+
+				return
+			}
+
+			if (wasActive) {
+				scrubState.cancelCurrentStrokeOnExit = true
+			}
+
+			maybeFinishScrub()
+
+			if (wasActive) {
+				const activeShapeId = drawingState.initialShape?.id
+				if (activeShapeId) {
+					scrubCanceledShapeIdsRef.current.add(activeShapeId)
+				}
+			}
+
+			if (scrubState.cancelCurrentStrokeOnExit) {
+				return
+			}
+
+			if (scrubState.active || wasActive !== scrubState.active) {
+				applyActiveBrushScale()
+			}
+
+			setPencilScrubHud((prev) => ({ ...prev, active: false }))
+			originalUpdateDrawingShape()
+			ensureActiveShapeIsPen()
+		}
+
+		drawingState.onPointerUp = () => {
+			if (scrubState.active || scrubState.cancelCurrentStrokeOnExit) {
+				const activeShapeId = drawingState.initialShape?.id
+				if (activeShapeId) {
+					scrubCanceledShapeIdsRef.current.add(activeShapeId)
+					suppressScrubArtifactUntilRef.current = Date.now() + 500
+					if (editor.getShape(activeShapeId)) {
+						editor.deleteShapes([activeShapeId])
+					}
+				}
+				scrubState.cancelCurrentStrokeOnExit = false
+				maybeFinishScrub()
+				setPencilScrubHud((prev) => ({ ...prev, active: false }))
+				drawingState.parent?.transition('idle')
+				return
+			}
+
+			originalOnPointerUp?.()
+		}
+
+		drawingState.onExit = () => {
+			const activeShapeId = drawingState.initialShape?.id
+			if (scrubState.cancelCurrentStrokeOnExit && activeShapeId) {
+				scrubCanceledShapeIdsRef.current.add(activeShapeId)
+				suppressScrubArtifactUntilRef.current = Date.now() + 500
+				if (editor.getShape(activeShapeId)) {
+					editor.deleteShapes([activeShapeId])
+				}
+			}
+			scrubState.cancelCurrentStrokeOnExit = false
+			maybeFinishScrub()
+			setPencilScrubHud((prev) => ({ ...prev, active: false }))
+			originalOnExit?.()
+		}
+
+		return () => {
+			maybeFinishScrub()
+			setPencilScrubHud((prev) => ({ ...prev, active: false }))
+			if (drawingState.onEnter) drawingState.onEnter = originalOnEnter
+			if (drawingState.updateDrawingShape) drawingState.updateDrawingShape = originalUpdateDrawingShape
+			if (drawingState.onPointerUp) drawingState.onPointerUp = originalOnPointerUp
+			if (drawingState.onExit) drawingState.onExit = originalOnExit
+		}
+	}, [
+		editor,
+		plugin.settingsManager,
+		userSettings.handwritingRecognition?.pencilBrushSizePx,
+	])
+
 	const searchableRecognitionResults = React.useMemo<SearchPanelResult[]>(() => {
 		const results = getDocumentRecognitionResults(handwritingDocumentId)
 			.filter((result) => result.status === 'success')
@@ -3986,10 +4007,11 @@ const TldrawApp = ({
 		const { minX, minY, maxX, maxY } = activeSearchResult.boundingBox
 		const topLeft = editor.pageToViewport({ x: minX, y: minY })
 		const bottomRight = editor.pageToViewport({ x: maxX, y: maxY })
+		if (!topLeft || !bottomRight) return null
 		const left = Math.min(topLeft.x, bottomRight.x)
 		const top = Math.min(topLeft.y, bottomRight.y)
-		const width = Math.abs(bottomRight.x - topLeft.x)
-		const height = Math.abs(bottomRight.y - topLeft.y)
+		const width = Math.abs((bottomRight?.x ?? 0) - (topLeft?.x ?? 0))
+		const height = Math.abs((bottomRight?.y ?? 0) - (topLeft?.y ?? 0))
 
 		return {
 			left,
@@ -4392,7 +4414,6 @@ const TldrawApp = ({
 				buildRecognitionCandidates(payloads)
 
 			setDocumentWordCandidates(handwritingDocumentId, recognitionCandidates)
-			syncPerformancePathAfterRecognition()
 			if (!manualMode) {
 				scheduleRecognition(recognitionCandidates)
 			}
@@ -4434,7 +4455,6 @@ const TldrawApp = ({
 			editor,
 			buildRecognitionCandidates,
 			handwritingDocumentId,
-			syncPerformancePathAfterRecognition,
 			scheduleRecognition,
 			userSettings.debugMode,
 		]
@@ -4452,7 +4472,6 @@ const TldrawApp = ({
 			const payloads = getAllNormalizedStrokePayloads(handwritingDocumentId)
 			const { manualMode, recognitionCandidates } = buildRecognitionCandidates(payloads)
 			setDocumentWordCandidates(handwritingDocumentId, recognitionCandidates)
-			syncPerformancePathAfterRecognition()
 
 			const nextCandidateIds = new Set(recognitionCandidates.map((candidate) => candidate.id))
 			for (const result of getDocumentRecognitionResults(handwritingDocumentId)) {
@@ -4487,7 +4506,6 @@ const TldrawApp = ({
 			clearCommittedCanvas,
 			handwritingDocumentId,
 			removeCurrentSidecarFiles,
-			syncPerformancePathAfterRecognition,
 			scheduleRecognition,
 			userSettings.debugMode,
 		]
@@ -4723,7 +4741,6 @@ const TldrawApp = ({
 			const payloads = getAllNormalizedStrokePayloads(handwritingDocumentId)
 			const { manualMode, recognitionCandidates } = buildRecognitionCandidates(payloads)
 			setDocumentWordCandidates(handwritingDocumentId, recognitionCandidates)
-			syncPerformancePathAfterRecognition()
 
 			const nextCandidateIds = new Set(recognitionCandidates.map((candidate) => candidate.id))
 			for (const result of getDocumentRecognitionResults(handwritingDocumentId)) {
@@ -4752,7 +4769,6 @@ const TldrawApp = ({
 			buildRecognitionCandidates,
 			editor,
 			handwritingDocumentId,
-			syncPerformancePathAfterRecognition,
 			scheduleRecognition,
 			userSettings.debugMode,
 		]
@@ -5095,8 +5111,7 @@ const TldrawApp = ({
 	}, [plugin])
 
 	return (
-		<KritaBrushRuntimeContext.Provider value={kritaBrushRuntimeContext}>
-			<div
+		<div
 				className={`tldraw-view-root${userSettings.darkModeInvert ? ' ptl-dark-mode-invert' : ''}${
 					pencilScrubHud.active ? ' ptl-pencil-scrubbing' : ''
 				}`}
@@ -5645,9 +5660,8 @@ const TldrawApp = ({
 				className={fbWorkAroundClassname}
 			/>
 			</div>
-		</KritaBrushRuntimeContext.Provider>
-	)
-}
+		)
+	}
 
 export const createRootAndRenderTldrawApp = (
 	node: Element,

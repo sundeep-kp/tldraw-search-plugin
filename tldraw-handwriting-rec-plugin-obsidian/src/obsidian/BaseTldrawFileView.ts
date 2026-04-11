@@ -13,6 +13,7 @@ import { parseDeepLinkString, TLDeepLink } from 'tldraw'
 import { intercept, Interceptor, MethodKeys } from '../utils/decorators/methods'
 import TldrawAssetsModal from './modal/TldrawAssetsModal'
 import PencilTool from 'src/tldraw/tools/pencil-tool'
+import PenTool from 'src/tldraw/tools/pen-tool'
 import { performanceMonitor } from 'src/utilities/performance-monitor'
 
 export interface DataUpdate {
@@ -300,7 +301,7 @@ export abstract class BaseTldrawFileView<View extends FileView = FileView> {
 			components: {
 				InFrontOfTheCanvas,
 			},
-			tools: [PencilTool],
+			tools: [PencilTool, PenTool],
 			onEditorMount: (editor) => {
 				if (this.#deepLink) {
 					editor.navigateToDeepLink(this.#deepLink)
