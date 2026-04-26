@@ -30,27 +30,42 @@ ok , so far i have implemented --
 7. added performance monitor
 8. added ability to wiki link other files within the canvas using a keyboard shortcut. ability to convert a handwritten text into a wikilink to a file
 
-
+9. all other default tldraw features like hold shift to draw a line(or tap a point hold shift and tap another point to create a line between them), basic shapes like rect, circle, triangle etc. , a lazer pointer, text etc.
 
 
 
 stuff that i request other people to fix: 
 1.the debug settings in the startup tab doesn't work well.
-2.add support for mathemical symbols
+2.add support for mathematical symbols
 
 
-features to add further-- 1.in the anchor links, if you right click an anchor link , you should be able to open a file inside the canvas , e.g a markdown file or even a canvas inside a canvas
+features to add further-- 1.in the anchor links, if you right click an anchor link , you should be able to open a file inside the canvas , e.g a markdown file or even a canvas inside a canvas -- in an iframe similar to the youtube videos thing
 
 2.gestures for shapes like in procreate
 
-3.a birdeye map of the project like in fps games, you can place flags that appear in the map
+3.a birdeye map of the project like in fps games, you can place flags that appear in the map -- physically it replaces the space where the pencil/pen menu once was
 
 4. ui changes to make almost everything collapsable to declutter the space
 
 5. find and replace, similar to vscode (use tldraw inbuilt font , and instead of deleting the word, just add the new replacement glowing red on top with a offset, use bounding box to determine font size)
 
 6. ability to link frames(right click selection) with lines(snap to frames) , the connection points stay attached to the frame even when moving them around(like in affine)
+
+7. continue videos where you left off last time. same with Notes.
+
+8. add a bar to change flow and opacity of pencil-- bcz the pencil does not feel bright and sharp enough without applying full pressure(this may wear out my stylus). change the stamp from circular to elliptical perhaps or a mix or both to provide a more natural feel. also add a smoothening control bar in settings (global for both pen and pencil).
 issues:
+
+9. add support for 3d files (maybe convert stl/ other formats into gltf or glb for easier rendering)
+
+10. pdf support (10.a. iframe inside edgeless canvas -- strokes made on the pdf are bound to the pdf, meaning when scrolled through the pdf the strokes move too, make sure to not "follow the pdf" but actually make them bound to each other; 10.b. pdf as canvas , all features of the plugin except the fact that the pdf behaves as a finite bound canvas) 
+
+11. custom background color and texture(repeating image tiles)
+
+12. single click E for brush , click again for brush
+
+13. add the chrome "ask google about this page" feature, everything -- canvas, pdf etc. (like an obsidian native button)
+issues-
 
 the ctrl + F works weird, as soon as you press ctrl + f you can immediately transported to a place even without clicking anything
 
@@ -58,6 +73,21 @@ the pencil isn't able to change color
 
 the pen is behaving like the pencil
 
-the pencil menu UI is clunky
+the pencil menu UI is clunky. We need a way to hide the menu bcz it obstructs a lot of view space
 
-if you draw fast, the stamp density decreases
+if you draw fast, the stamp density decreases. if a stroke runs long enough , the rest of the stroke becomes a pen stroke
+
+a lot of options in youtube videos are missing like skip 10 seconds or captions or fullscreen  (like actual screen not just canvas) or ask gemini etc. the options bar of the youtube video is very bad in terms of scaling (doesn't scale to the width of the iframe) . also we should be able to use ALL youtube shortcuts when the iframe is selected
+
+normal offline video files don't have controls to them
+
+sometimes mouse click doesn't work if drawing tablet is connected
+
+need bug and performance testing in canvas containing one or more youtube videos (one time there was a pause play bug and another time i face a lot of lag when using the pencil while a video played) . also sometimes the bitmap caches just stops happening if i let the canvas run long enough.
+
+
+
+bitmap cache performance bug observed : it has been observed that caching occurs each time i open a file, meaning cache is never actually saved in permanent storage. also deletion of more than 50 strokes of pencil take a long time. 
+
+
+youtube video links like https://www.youtube.com/watch?v=Ck6k1ulzgec&list=PLBlnK6fEyqRhG6s3jYIU48CqsT5cyiDTO&index=144 are actually treated like playlists instead of single video . solution-- add a dialog box to choose whether to import single video or the entire playlist

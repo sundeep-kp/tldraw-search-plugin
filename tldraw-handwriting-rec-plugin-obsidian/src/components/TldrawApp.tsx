@@ -278,6 +278,7 @@ const components = (_plugin: TldrawPlugin): TLComponents => ({
 const PENCIL_BRUSH_MIN_PX = 1
 const PENCIL_BRUSH_MAX_PX = 600
 const DEFAULT_PENCIL_BRUSH_PX = 24
+const MOVED_SHAPES_FLUSH_DEBOUNCE_MS = 160
 const PENCIL_SCRUB_PX_PER_SCREEN_PIXEL = 0.25
 
 const ANY_WEBSITE_EMBED_DEFINITION: TLEmbedDefinition = {
@@ -1172,6 +1173,10 @@ const TldrawApp = ({
 	>(null)
 	const playlistAutoImportKeyRef = React.useRef<string | null>(null)
 	const youtubeIframeRef = React.useRef<HTMLIFrameElement | null>(null)
+	const movedShapeIdsBufferRef = React.useRef<Set<TLShapeId>>(new Set())
+	const movedShapesFlushTimerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(
+		undefined
+	)
 	const enableCanvasRasterPipeline = false
 	const handwritingDocumentId = React.useMemo(() => {
 		if (store && 'plugin' in store && store.plugin) {
@@ -4806,7 +4811,7 @@ const TldrawApp = ({
 		plugin,
 	])
 
-	const onShapesMoved = React.useCallback(
+	const processMovedShapes = React.useCallback(
 		(shapeIds: TLShapeId[]) => {
 			if (!Array.isArray(shapeIds) || shapeIds.length === 0) return
 			if (!editor) return
@@ -4869,6 +4874,35 @@ const TldrawApp = ({
 		]
 	)
 
+	const scheduleMovedShapesFlush = React.useCallback(() => {
+		if (movedShapesFlushTimerRef.current !== undefined) {
+			clearTimeout(movedShapesFlushTimerRef.current)
+		}
+
+		movedShapesFlushTimerRef.current = setTimeout(() => {
+			const shapeIds = Array.from(movedShapeIdsBufferRef.current)
+			movedShapeIdsBufferRef.current.clear()
+			movedShapesFlushTimerRef.current = undefined
+
+			if (shapeIds.length > 0) {
+				processMovedShapes(shapeIds as TLShapeId[])
+			}
+		}, MOVED_SHAPES_FLUSH_DEBOUNCE_MS)
+	}, [processMovedShapes])
+
+	const onShapesMoved = React.useCallback(
+		(shapeIds: TLShapeId[]) => {
+			if (!Array.isArray(shapeIds) || shapeIds.length === 0) return
+
+			for (const shapeId of shapeIds) {
+				movedShapeIdsBufferRef.current.add(shapeId)
+			}
+
+			scheduleMovedShapesFlush()
+		},
+		[scheduleMovedShapesFlush]
+	)
+
 	React.useEffect(() => {
 		acquireDocumentStrokePayloadScope(handwritingDocumentId)
 		acquireDocumentWordCandidateScope(handwritingDocumentId)
@@ -4884,6 +4918,11 @@ const TldrawApp = ({
 				clearTimeout(recognitionDebounceTimerRef.current)
 				recognitionDebounceTimerRef.current = undefined
 			}
+			if (movedShapesFlushTimerRef.current) {
+				clearTimeout(movedShapesFlushTimerRef.current)
+				movedShapesFlushTimerRef.current = undefined
+			}
+			movedShapeIdsBufferRef.current.clear()
 			recognitionRunVersionRef.current += 1
 
 			releaseDocumentStrokePayloadScope(handwritingDocumentId)

@@ -31,12 +31,14 @@ features to add further-- 1.in the anchor links, if you right click an anchor li
 5. find and replace, similar to vscode (use tldraw inbuilt font , and instead of deleting the word, just add the new replacement glowing red on top with a offset, use bounding box to determine font size)
 
 6. ability to link frames(right click selection) with lines(snap to frames) , the connection points stay attached to the frame even when moving them around(like in affine)
+
+7. add a slider bar for flow in pencil
 issues:
 
-the ctrl + F works weird, as soon as you press ctrl + f you can immediately transported to a place even without clicking anything
+1.the ctrl + F works weird, as soon as you press ctrl + f you can immediately transported to a place even without clicking anything
 
 the pencil isn't able to change color
-7.if you draw fast, the stamp density decreases
+2.if you draw fast, the stamp density decreases
 
 
 *REPO MAP*
